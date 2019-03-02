@@ -1,11 +1,9 @@
 # etcd-book
 
-## ビルド方法
+## PDFの生成方法
 
 ```console
-# ソースコードの埋め込み
-make preproc
-
-# PDFの生成
 make pdf
 ```
+
+Powered by [Re:VIEW Starter](https://kauplan.org/reviewstarter/)

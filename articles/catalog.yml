@@ -1,7 +1,10 @@
 PREDEF:
 
 CHAPS:
-  - etcd-book.re
+  - chapter1.re
+  - chapter2.re
+  - chapter3.re
+  - chapter4.re
 
 APPENDIX:
 

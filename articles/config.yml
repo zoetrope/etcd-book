@@ -5,7 +5,8 @@
 # このファイルはUTF-8エンコーディングで記述してください。
 
 # この設定ファイルでサポートするRe:VIEWのバージョン番号。
-review_version: 3.0
+# major versionが違うときにはエラーを出す。
+review_version: 2.0
 
 # ほかの設定ファイルの継承を指定できる。同じパラメータに異なる値がある場合は、
 # 呼び出し元の値が優先される。
@@ -16,17 +17,23 @@ review_version: 3.0
 # inherit: ["A.yml", "B.yml"]
 
 # ブック名(ファイル名になるもの。ASCII範囲の文字を使用)
-bookname: book
+bookname: etcd-book
 # 記述言語。省略した場合はja
 language: ja
 
 # 書名
 # 読みを入れる例 booktitle: {name: "Re:VIEW EPUBサンプル", file-as: "リビューイーパブサンプル"}
-booktitle: Go言語で学ぶetcd入門
+# （タイトルやサブタイトルが長い場合は、好みの箇所に改行を入れてください。）
+booktitle: |-
+  etcd book
+subtitle: |-
+  Go言語で学ぶetcd入門
 
 # 著者名。「, 」で区切って複数指定できる
 # 読みを入れる例 aut: [{name: "青木峰郎", file-as: "アオキミネロウ"}, {name: "武藤健志", file-as: "ムトウケンシ"}, {name: "高橋征義", file-as: "タカハシマサヨシ"}, {name: "角征典", file-as: "カドマサノリ"}]
-aut: ["zoetrope"]
+aut:
+  - name:    zoetro
+    file-as: ぞえとろ
 
 # 以下はオプション
 # 以下はオプション(autと同じように配列書式で複数指定可能)。
@@ -57,6 +64,7 @@ aut: ["zoetrope"]
 # a-pht, pht: 撮影責任者
 # a-pbl, pbl: 出版社（発行所）
 # a-prt, prt: 印刷所
+prt: 
 # a-red, red: 項目の枠組起草者
 # a-rev, rev: 評論者
 # a-spn, spn: 援助者
@@ -65,14 +73,16 @@ aut: ["zoetrope"]
 # a-trl, trl: 翻訳者
 
 # 刊行日(省略した場合は実行時の日付)
-date: 2019-03-01
+date: 2019-04-14
 # 発行年月。YYYY-MM-DD形式による配列指定。省略した場合はdateを使用する
 # 複数指定する場合は次のように記述する
 # [["初版第1刷の日付", "初版第2刷の日付"], ["第2版第1刷の日付"]]
 # 日付の後ろを空白文字で区切り、任意の文字列を置くことも可能。
-history: [["2019-03-01"]]
+history: [["2019-04-14 ver 1.0"]]
+# [experimental] 新刊を頒布したイベント名（例：「技術書典6（2019年春）新刊」）
+pubevent_name: 
 # 権利表記(配列で複数指定可)
-# rights: (C) 2016-2018 Re:VIEW Developers
+rights: (C) 2019 zoetro
 # description: 説明
 # subject: 短い説明用タグ(配列で複数指定可)
 # type: 書籍のカテゴリーなど(配列で複数指定可)
@@ -82,7 +92,7 @@ history: [["2019-03-01"]]
 # coverage: 内容の範囲や領域(配列で複数指定可)
 
 # デバッグフラグ。nullでないときには一時ファイルをカレントディレクトリに作成し、削除もしない
-debug: null
+debug: false
 
 # 固有IDに使用するドメイン。指定しない場合には、時刻に基づくランダムUUIDが入る
 # urnid: urn:uid:http://example.com/book-title/
@@ -97,40 +107,50 @@ debug: null
 stylesheet: ["style.css"]
 
 # ePUBのバージョン (2か3)
-# epubversion: 3
+# epubversion: 2
 #
 # HTMLのバージョン (4か5。epubversionを3にしたときには5にする)
-# htmlversion: 5
+# htmlversion: 4
 
 # 目次として抽出する見出しレベル
-toclevel: 3
+toclevel: 3               # （部と）章と節と小節を目次に載せる
 
 # 採番の設定。採番させたくない見出しには「==[nonum]」のようにnonum指定をする
 #
 # 本文でセクション番号を表示する見出しレベル
-secnolevel: 2
+secnolevel: 2              # 章 (chapter) と節 (section) にだけ番号をつける
+#secnolevel: 3             # 小節 (subsection) にも番号をつける
+
+# 以下のsecnolevelはまだ未実装。
+# 前付でセクション番号を表示する見出しレベル(未実装)
+# pre_secnolevel: 0
+#
+# 後付(付録)でセクション番号を表示する見出しレベル(未実装)
+# post_secnolevel: 1
+#
+# 部番号を表示する見出しレベル(未実装)
+# part_secnolevel: 1
 
 # 本文中に目次ページを作成するか。省略した場合はnull (作成しない)
-# toc: true
+toc: true
 
 # EPUB2標準の目次(NCX)以外に物理目次ファイルを作成するか。省略した場合はnull (作成しない)
 # ePUB3においてはこの設定によらず必ず作成される
 # mytoc: true
 
-# 表紙にするファイル。ファイル名を指定すると表紙として入る (PDFMaker向けにはLaTeXソース断片、EPUBMaker向けにはHTMLファイル)
+# 表紙にするHTMLファイル。ファイル名を指定すると表紙として入る
 # cover: null
 #
 # 表紙に配置し、書籍の影絵にも利用する画像ファイル。省略した場合はnull (画像を使わない)。画像ディレクトリ内に置いてもディレクトリ名は不要(例: cover.jpg)
-# PDFMaker 固有の表紙設定は pdfmaker セクション内で上書き可能
 coverimage: cover.jpg
 #
 # 表紙の後に大扉ページを作成するか。省略した場合はtrue (作成する)
-# titlepage: true
+titlepage: true
 #
 # 自動生成される大扉ページを上書きするファイル。ファイル名を指定すると大扉として入る (PDFMaker向けにはLaTeXソース断片、EPUBMaker向けにはHTMLファイル)
 # titlefile: null
 #
-# 原書大扉ページにするファイル。ファイル名を指定すると原書大扉として入る (PDFMaker向けにはLaTeXソース断片、EPUBMaker向けにはHTMLファイル)
+# 原書大扉ページにするHTMLファイル。ファイル名を指定すると原書大扉として入る (PDFMaker向けにはLaTeXソース断片、EPUBMaker向けにはHTMLファイル)
 # originaltitlefile: null
 #
 # 権利表記ページファイル。ファイル名を指定すると権利表記として入る (PDFMaker向けにはLaTeXソース断片、EPUBMaker向けにはHTMLファイル)
@@ -170,57 +190,14 @@ coverimage: cover.jpg
 # カタログファイル名を指定する
 # catalogfile: catalog.yml
 
-# reファイルを格納するディレクトリ。省略した場合は以下 (. はカレントディレクトリを示す)
-# contentdir: .
-
-# @<w>命令で使用する単語ファイルのパス
-# words_file: words.csv
-
-# review-vol向けのヒント情報
-# 1ページの行数文字数と1kbごとのページ数を用紙サイズで指定する(A5 or B5)
+# 1ページの行数文字数と1kbごとのページ数を用紙サイズで指定する(A5 or B5)。
 # page_metric: A5
 #
 # あるいは、配列で指定することもできる
-# 各数字の意味は、順にリストの行数、リストの1行字数、テキストの行数、テキストの1行字数、1kバイトごとのページ数
+# 各数字の意味は、順にリストの行数、リストの1行字数、テキストの行数、テキストの1行字数、1kバイト毎のページ数
 # page_metric: [40,80,40,80,2]
 
-# EPUBおよびWeb生成における数式の画像化指定
-# TeXの数式を画像化するか。省略した場合はnull (作成しない)
-# imgmath: true
-
-# imgmathがtrueの場合の設定
-# 以下のパラメータを有効にするときには、
-# imgmath_options:
-#    パラメータ: 値
-#    パラメータ: 値
-#   ...
-# という構成にする必要がある(インデントさせる)
-# imgmath_options:
-  # 使用する画像拡張子。通常は「png」か「svg」（svgの場合は、pdfcrop_pixelize_cmdの-pngも-svgにする）
-  # format: png
-  # 変換手法。pdfcrop または dvipng
-  # converter: pdfcrop
-  # プリアンブルの内容を上書きするファイルを指定する（デフォルトはupLaTeX+jsarticle.clsを前提とした、lib/review/makerhelper.rbのdefault_imgmath_preambleメソッドの内容）
-  # preamble_file: null
-  # 基準のフォントサイズ
-  # fontsize: 10
-  # 基準の行間
-  # lineheight: 12
-  # converterにpdfcropを指定したときのpdfcropコマンドのコマンドライン。プレースホルダは
-  # %i: 入力ファイル、%o: 出力ファイル
-  # pdfcrop_cmd: "pdfcrop --hires %i %o"
-  # PDFから画像化するコマンドのコマンドライン。プレースホルダは
-  # %i: 入力ファイル、%o: 出力ファイル、%O: 出力ファイルから拡張子を除いたもの
-  # %p: 対象ページ番号
-  # pdfcrop_pixelize_cmd: "pdftocairo -png -r 90 -f %p -l %p -singlefile %i %O"
-  # pdfcrop_pixelize_cmdが複数ページの処理に対応していない場合に単ページ化するか
-  # extract_singlepage: null
-  # extract_singlepageがtrueの場合に単ページ化するコマンドのコマンドライン
-  # pdfextract_cmd: "pdfjam -q --outfile %o %i %p"
-  # converterにdvipngを指定したときのdvipngコマンドのコマンドライン
-  # dvipng_cmd: "dvipng -T tight -z 9 -p %p -l %p -o %o %i"
-
-# EPUBにおけるページ送りの送り方向、page-progression-directionの値("ltr"|"rtl"|"default")
+# ページ送りの送り方向、page-progression-directionの値("ltr"|"rtl"|"default")
 # direction: "ltr"
 
 # EPUBのOPFへの固有の追加ルール
@@ -309,24 +286,31 @@ epubmaker:
   # epubmaker:階層を使うものはここまで
 
 # LaTeX用のスタイルファイル(styディレクトリ以下に置くこと)
-texstyle: ["reviewmacro"]
+texstyle: [reviewmacro, starter, mystyle, mytitlepage, mycolophon]
 #
 # LaTeX用のdocumentclassを指定する
-# オプションについてはsty/README.mdを参照
-# デフォルトは印刷用。電子配布版を作るには media=ebook とする
-texdocumentclass: ["review-jsbook", "media=print,paper=a5"]
+# texdocumentclass: ["jsbook", "uplatex,oneside"]
+texdocumentclass: ["jsbook",
+    #"uplatex,papersize,twoside,b5j,10pt,openright" # B5 10pt 右起こし
+    #"uplatex,papersize,twoside,b5j,10pt,openany"   # B5 10pt 両起こし
+    #"uplatex,papersize,twoside,a5j,9pt,openright"  # A5  9pt 右起こし
+    #"uplatex,papersize,twoside,a5j,9pt,openany"    # A5  9pt 両起こし
+    #"uplatex,papersize,oneside,a5j,10pt,openany"   # A5 10pt 両起こし（タブレット向け）
+    "uplatex,papersize,twoside,b5j,10pt,openany"
+]
 #
 # LaTeX用のコマンドを指定する
 # texcommand: "uplatex"
 #
 # LaTeXのコマンドに渡すオプションを指定する
-# texoptions: "-interaction=nonstopmode -file-line-error"
+# texoptions: null
+texoptions: "-halt-on-error -file-line-error"  # エラー時にインタラクティブモードにしない、エラー箇所はファイル名つきで表示
 #
 # LaTeX用のdvi変換コマンドを指定する(dvipdfmx)
 # dvicommand: "dvipdfmx"
 #
-# LaTeX用のdvi変換コマンドのオプションを指定する。変換が遅い場合は`-d 5 -z 3`等にする
-# dvioptions: "-d 5 -z 9"
+# LaTeX用のdvi変換コマンドのオプションを指定する
+dvioptions: "-d 5 -z 3"  # -z 9 だと画像を最大圧縮する（ただし時間がかかる）
 
 # 以下のパラメータを有効にするときには、
 # pdfmaker:
@@ -337,53 +321,27 @@ texdocumentclass: ["review-jsbook", "media=print,paper=a5"]
 #
 pdfmaker:
   #
-  # TeX版で利用する表紙画像。
-  # 仕上がりサイズ+塗り足し3mmありのPDFまたはIllustratorファイル（PDF互換オプション付き）を推奨。
-  # 拡縮はされず「そのまま」貼り付けられる
-  coverimage: cover-a5.ai
-  #
   # TeXコンパイル前に実行するプログラム。変換後のTeXソースを調整したいときに使用する。
   # 渡される引数1=作業用展開ディレクトリ、引数2=呼び出しを実行したディレクトリ
   # hook_beforetexcompile: null
+  hook_beforetexcompile: [lib/hooks/beforetexcompile.rb]
   #
-  # 索引処理前に実行するプログラム。idxファイルを加工したいときなどに使用する。
-  # 渡される引数1=作業用展開ディレクトリ、引数2=呼び出しを実行したディレクトリ
-  # hook_beforemakeindex: null
-  #
-  # 索引処理後に実行するプログラム。indファイルを加工したいときなどに使用する。
-  # 渡される引数1=作業用展開ディレクトリ、引数2=呼び出しを実行したディレクトリ
-  # hook_aftermakeindex: null
-  #
-  # ひととおりのコンパイル後に実行するプログラム。目次を加工して再度コンパイルしたいときなどに使用する。
+  # TeXコンパイル後に実行するプログラム。索引作業をして再度コンパイルしたいときなどに使用する。
   # 渡される引数1=作業用展開ディレクトリ、引数2=呼び出しを実行したディレクトリ
   # hook_aftertexcompile: null
   #
-  # PDF(__REVIEW_BOOK__.pdf)作成後に実行するプログラム。PDFに加工を施したいときに使用する。
+  # PDF(book.pdf)作成後に実行するプログラム。PDFに加工を施したいときに使用する。
   # 渡される引数1=作業用展開ディレクトリ、引数2=呼び出しを実行したディレクトリ
   # hook_afterdvipdf: null
   #
-  # 画像のscale=X.Xという指定を画像拡大縮小率からページ最大幅の相対倍率に変換する
+  # 画像のscale=X.Xという指定を画像拡大縮小率からページ最大幅の相対倍率に変換します。
   # image_scale2width: true
   #
-  # PDFやIllustratorファイル(.ai)の画像のBoudingBoxの抽出に指定のボックスを採用する
-  # cropbox(デフォルト), mediabox, artbox, trimbox, bleedboxから選択する。
-  # Illustrator CC以降のIllustratorファイルに対してはmediaboxを指定する必要がある
-  # bbox: mediabox
-  #
-  # 索引を作成するか。trueにすると索引作成が有効になる
-  # makeindex: null
-  # 索引作成コマンド
-  # makeindex_command: mendex
-  # 索引作成コマンドのオプション
-  # makeindex_options: "-f -r -I utf8"
-  # 索引作成コマンドのスタイルファイル
-  # makeindex_sty: null
-  # 索引作成コマンドの辞書ファイル
-  # makeindex_dic: null
-  # MeCabによる索引読み探索を使うか
-  # makeindex_mecab: true
-  # MeCabの読みの取得オプション
-  # makeindex_mecab_opts: "-Oyomi"
   # 奥付を作成するか。trueを指定するとデフォルトの奥付、ファイル名を指定するとそれがcolophon.htmlとしてコピーされる
   colophon: true
+  #
+  # 表紙に配置し、書籍の影絵にも利用する画像ファイル。同人誌の印刷では一般的に、表紙は本文と別ファイルにするので、ここはnullにする。
+  coverimage: null
+  #
   # pdfmaker:階層を使うものはここまで
+

@@ -1,0 +1,574 @@
+%%% -*- coding: utf-8 -*-
+
+%%%
+%%% Re:VIEW Starter によって自動生成されたスタイルファイル
+%%%
+
+
+%%%
+%%% 色の設定
+%%%
+%%% 白黒
+\definecolor{starter@chaptercolor}{gray}{0.40}  % 0.0: black, 1.0: white
+\definecolor{starter@sectioncolor}{gray}{0.40}
+\definecolor{starter@captioncolor}{gray}{0.40}
+\definecolor{starter@quotecolor}{gray}{0.40}
+%%% カラー（CYMK、紙書籍向け）
+%\definecolor{starter@chaptercolor}{cmyk}{0.82,0.0,0.04,0.30} % #20B2AA, lightseagreen
+%\definecolor{starter@sectioncolor}{cmyk}{0.82,0.0,0.04,0.30} % #20B2AA, lightseagreen
+%\definecolor{starter@captioncolor}{cmyk}{0.0,0.35,1.0,0.0}   % #FFA500, orange
+%\definecolor{starter@quotecolor}{cmyk}{0.08,0.08,0.0,0.02}   % #E6E6FA, lavender
+%%% カラー（RGB、タブレット向け）
+%\definecolor{starter@chaptercolor}{HTML}{20B2AA} % lightseagreen
+%\definecolor{starter@sectioncolor}{HTML}{20B2AA} % lightseagreen
+%\definecolor{starter@captioncolor}{HTML}{FFA500} % orange
+%\definecolor{starter@quotecolor}{HTML}{E6E6FA}   % lavender
+
+
+%%% 目次やリンクは、デフォルトでは赤くなり印刷には向かないので、黒くする。
+%%% （電子書籍用PDFでは、リンクであることがわかるよう色をつけたほうがよい。
+%%%   またリンクに色をつけるなら、ブラウザと同じで青がお勧め。）
+%\hypersetup{colorlinks=true}                % 赤（デフォルト）
+%\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}  % 青（電子書籍用）
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=black} % 黒（印刷用）
+%\hypersetup{colorlinks=false}
+
+
+%%% 「@<strong>{ ... }」を太字のゴシック体にする（「@<b>{ ... }」は明朝体のまま）。
+\renewcommand{\reviewstrong}[1]{\textbf{\gtfamily\sffamily #1}}
+
+%%% 「@<em>{ ... }」をゴシック体にする。
+\renewcommand{\reviewem}[1]{{\gtfamily\sffamily #1}}
+
+%%% 「@<del>{ ... }」（取り消し線）が効くようにする。
+%%% (See https://qiita.com/takahashim/items/5c1af2941a1ce9fa5919)
+\usepackage{ulem}
+\renewcommand{\reviewstrike}[1]{\sout{#1}}
+%\usepackage{jumoline}
+%\renewcommand{\reviewstrike}[1]{\Middleline{#1}}
+
+
+%%% ソースコードの表示で使う等幅フォントを変更（好きなのを1つだけ選択）。
+%%% 参考： http://www.tug.dk/FontCatalogue/typewriterfonts.html
+%%% Starterでは、//list と //cmd にberamonoを、//terminal にnarrow inconsolataを使う。
+%%% （Tips: inconsolataのnottを外し、beramonoの行をコメントアウトすると、
+%%%   //list や //cmd の表示も幅が狭い等幅フォントが使われるようになる。）
+%\usepackage{courier}     % 太字がとても目立つ、「1 l」や「0 O」が見分けにくい
+%\usepackage[scale]{nimbusmononarrow}  % 太字が効かない、「1 l」や「0 O」が見分けにくい
+\usepackage[scaled]{beramono}  % 「0」に点が入る、「'」「`」が見分けにくい
+%\usepackage[varl,varqu,mono]{inconsolata}  % 「0」に斜線が入る、varlつけると「1 l」が見分けやすい
+\usepackage[nott,varl,varqu,mono,narrow]{inconsolata}  % 上と同じだが幅が狭い、nottつけるとdefault fontを変更しない
+
+
+%%% 番号なし箇条書きの行頭文字を変更
+\usepackage{amssymb}            % \blacktriangleright や \bigstar のために必要
+%\renewcommand{\labelitemi}{$\blacktriangleright$}  % 深さ1段目：小さい黒丸→小さい三角へ
+\renewcommand{\labelitemii}{$\circ$}                % 深さ2段目：「-」→小さい白丸へ
+%\renewcommand{\labelitemiii}{{\small$\bigstar$}}   % 深さ3段目：「*」→星形へ
+
+
+%%% 図や表のキャプションを見映えよくする
+\let\original@makecaption\@makecaption  % jsbook.clsでの定義を保存し、あとで再利用
+\renewcommand{\@makecaption}[2]{%       % 図や表のキャプション
+  \original@makecaption{\starter@captionfont\starter@captionprefix #1}{\starter@captionfont #2}
+}
+%\usepackage{amssymb}   % $\blacktriangle$ や $\blacktriangledown$ に必要
+\newcommand{\starter@captionfont}{\gtfamily\sffamily}  % キャプションをゴシック体に
+\newcommand{\starter@captionsymbolup}{▲}    % または $\blacktriangle$
+\newcommand{\starter@captionsymboldown}{▼}  % または $\blacktriangledown$
+\newcommand{\starter@captionsymbol}{\starter@captionsymboldown} % デフォルトは「▼」
+\newcommand{\starter@captionprefix}{%        % キャプションの接頭辞
+  \textcolor{starter@captioncolor}{\starter@captionsymbol}%  % 「▲」や「▼」に色をつける
+}
+\renewcommand{\reviewimagecaption}[1]{{%     % 図のキャプションは図の下につくので、
+  \def\starter@captionsymbol{\starter@captionsymbolup}%  % 接頭辞を「▼」から「▲」に変更
+  \caption{#1}%
+}}
+
+
+%%% 「//list」や「//cmd」のキャプション（説明）の直後で改ページされるのを防ぐ
+%%% （ただし同じページに画像がある場合は、うまく動作しないことがあるので注意）
+\usepackage{needspace}         % \needspaceコマンドを使うのに必要
+\newcommand{\starter@listcaption}[1]{%
+  %\medskip{\small\noindent #1}\vspace*{-1.3zw}%    % original
+  \needspace{2zh}%             % 全角2文字分の高さの余白がなければ改ページ
+  \medskip%                    % 縦方向の余白を入れる
+  \noindent%                   % キャプションをインデントしない
+  {%
+    \small%                   % キャプションを小さくする
+    \starter@captionfont\starter@captionprefix% % ゴシック体に変更、接頭辞をつける
+    #1%                        % キャプションを表示
+  }%
+  \par%
+  \starter@listcaptionsep%
+}
+\newcommand{\starter@listcaptionsep}{%
+  \vspace*{-1.2zw}%            % 縦方向の余白を減らす
+}
+\renewcommand{\reviewlistcaption}[1]{\starter@listcaption{#1}}  % for //list
+\renewcommand{\reviewemlistcaption}[1]{\starter@listcaption{#1}}  % for //emlist
+\renewcommand{\reviewsourcecaption}[1]{\starter@listcaption{#1}}  % for //source
+\renewcommand{\reviewcmdcaption}[1]{\starter@listcaption{#1}}  % for //cmd
+\renewcommand{\reviewboxcaption}[1]{\starter@listcaption{#1}}  % for //box
+
+%%% 「//emlist[][言語名]」のようにキャプションを省略したときに
+%%% 本文とコードとの間の余白が広くなりすぎるバグを回避
+\def \ifempty#1{\def\temp{#1} \ifx\temp\empty }
+\renewcommand{\reviewemlistcaption}[1]{%
+  %\medskip{\small\noindent #1}\vspace*{-1.3zw} %% original
+  \ifempty{#1}\else%
+    \starter@listcaption{#1}%
+  \fi%
+}
+
+
+%%% 「//list」や「//cmd」用の環境を共通化する
+\newcommand{\starter@codestart}[1]{%
+  \begin{#1}%
+    \vspace*{-1.0zw}
+    \small%    %% コードのフォントサイズを小さくする
+    \setlength{\baselineskip}{1.3zw}%
+    \begin{alltt}%
+}
+\newcommand{\starter@codeend}[1]{%
+    \end{alltt}%
+    \vspace*{-1.0zw}%
+  \end{#1}%
+  %% 縦方向に十分な空きがあるのにコードが次ページへ送られる問題への対策
+  \par\vspace*{0.5mm}%   %% 段落を改めてから、ごく狭いスペースを入れる
+}
+
+%%% 「//emlist」の上下余白を狭める
+\renewenvironment{reviewemlist}{%
+  %\medskip%           %% original
+  \starter@codestart{shaded}%
+}{%
+  \starter@codeend{shaded}%
+}
+
+%%% 「//list」の上下余白を狭める
+\renewenvironment{reviewlist}{%
+  \starter@codestart{shaded}%
+}{%
+  \starter@codeend{shaded}%
+  %\par\vspace*{0.5zw}%  %% original
+}
+
+%%% 「//source」の上下余白を狭める
+\renewenvironment{reviewsource}{%
+  \starter@codestart{shaded}%
+}{%
+  \starter@codeend{shaded}%
+  %\par\vspace*{0.5zw}%  %% original
+}
+
+%%% 「//cmd」の上下余白を狭める
+\renewenvironment{reviewcmd}{%
+  \color{white}%
+  %\medskip%           %% original
+  \starter@codestart{shadedb}%
+}{%
+  \starter@codeend{shadedb}%
+}
+
+
+%%% 「//list」や「//emlist」の枠と文字との隙間を狭くする
+\renewenvironment{shaded}{%
+  %\def\FrameCommand{\fboxsep=\FrameSep \colorbox{shadecolor}}%
+  \def\FrameCommand{\fboxsep=0.65\FrameSep \colorbox{shadecolor}}%
+  \MakeFramed {\FrameRestore}}%
+ {\endMakeFramed}
+
+%%% 「//cmd」の枠と文字との隙間を狭くする
+\renewenvironment{shadedb}{%
+  %\def\FrameCommand{\fboxsep=\FrameSep \colorbox{shadecolorb}}%
+  \def\FrameCommand{\fboxsep=0.65\FrameSep \colorbox{shadecolorb}}%
+  \MakeFramed {\FrameRestore}}%
+ {\endMakeFramed}
+
+
+%%% ターミナル（//terminal[label][caption][optionstr]{ ... //}）
+\usepackage{seqsplit}
+%\renewcommand{\seqinsert}{\ifmmode\allowbreak\else\hspace{0pt plus 0.02em}\fi} % original
+\renewcommand{\seqinsert}{\ifmmode\allowbreak\else\hspace{0pt}\fi}
+\newenvironment{starterterminal}{%
+  \renewcommand{\ttdefault}{zi4}%   % 幅の狭い等幅フォント(narrow inconsolata)を使う
+  \begin{reviewcmd}%
+}{%
+  \end{reviewcmd}%
+}
+\newcommand{\starterterminalcaption}[1]{\starter@listcaption{#1}}
+
+
+%%% 章 (Chapter) の番号とタイトルと上下の余白を表示する
+%\def\@makechapterhead#1{%    (jsbook.clsでのオリジナル定義)
+%  \vspace*{2\Cvs}% 欧文は50pt
+%  {\parindent \z@ \raggedright \normalfont
+%    \ifnum \c@secnumdepth >\m@ne
+%      \if@mainmatter
+%        \huge\headfont \@chapapp\thechapter\@chappos
+%        \par\nobreak
+%        \vskip \Cvs % 欧文は20pt
+%      \fi
+%    \fi
+%    \interlinepenalty\@M
+%    \Huge \headfont #1\par\nobreak
+%    \vskip 3\Cvs}} % 欧文は40pt
+%
+\renewcommand{\@makechapterhead}[1]{%
+  \vspace*{-3zw}                            % 章タイトル上部の余白を詰める
+  \starter@chapterhead{#1}                  % 章タイトルを組み立てる
+  \vspace{2\baselineskip}                   % 章タイトルのあとに余白を空ける
+}
+%% 装飾する・しないを判断して、章の番号とタイトルを表示（上下の余白は除く）
+\newcommand{\starter@chapterhead}[1]{{%
+  \setlength{\parindent}{0pt}               % 段落の最初のインデントをなしに
+  \ifnum \c@secnumdepth >\m@ne
+    \if@mainmatter                          % まえがきや目次でないなら
+      \starter@chapterhead@decorated{\thechapter}{#1} % 装飾つきで表示
+    \else                                   % まえがきや目次なら
+      \starter@chapterhead@plain{#1}        %   装飾なしで表示
+    \fi
+  \else
+      \starter@chapterhead@plain{#1}        %   装飾なしで表示
+  \fi
+}}
+%% 装飾つきで章番号とタイトルを表示
+\newcommand{\starter@chapterhead@decorated}[2]{{%  % #1: 章番号、#2: 章タイトル
+  \raggedright                              % 左寄せ
+  %\centering                               % 中央寄せ
+  %\raggedleft                              % 右寄せ
+  %\textcolor{starter@chaptercolor}{\rule{\textwidth}{0.9zw}} % 章タイトル上部に太い横線
+  %\par\vspace{1.7zw}                       % 余白
+  \starter@chapternumber{#1}                % 章番号を出力
+  %\par\vspace{1.5zw}                       % 余白（章番号とタイトルで2行のとき）
+  \hspace{1zw}                              % 1文字空ける（章番号とタイトルで1行のとき）
+  \starter@chaptertitle{#2}                 % 章タイトルを出力
+  %\par\vspace{1.5zw}                       % 余白
+  %\textcolor{starter@chaptercolor}{\rule{\textwidth}{0.9zw}} % 章タイトル下部に太い横線
+  %\par\vspace{1zw}                         % 余白
+  \textcolor{starter@chaptercolor}{\rule{\textwidth}{0.2pt}} % 章タイトル下部に細い横線
+  \par                                      % 段落を改める
+}}
+%% 装飾なしで章番号とタイトルを表示（まえがきや目次用）
+\newcommand{\starter@chapterhead@plain}[1]{{%  % #2: 章タイトル
+  \raggedright                              % 左寄せ
+  %\centering                               % 中央寄せ
+  %\raggedleft                              % 右寄せ
+  \starter@chaptertitle{#1}                 % 章タイトルを出力
+  \par                                      % 段落を改める
+  \textcolor{starter@chaptercolor}{\rule{\textwidth}{0.2pt}} % 章タイトル下部に下線
+  \par                                      % 段落を改める
+}}
+%% 章番号を表示
+\newcommand{\starter@chapternumber}[1]{%    % #1: 章番号
+  %{\huge\headfont \@chapapp #1\@chappos}        % jsbook.clsのデフォルト
+  {\headfont\LARGE\@chapapp{\HUGE #1}\@chappos}  % 番号を大きくして出力
+}
+%% 章タイトルを表示
+\newcommand{\starter@chaptertitle}[1]{%     % #1: 章タイトル
+  {\Huge\headfont #1}                       % 大きいサイズ、ゴシック体で出力
+}
+
+
+%%% セクション（節）タイトルのデザインを変更（jsbook.clsからコピーして変更）
+\renewcommand{\section}{%
+  \if@slide\clearpage\fi
+  \@startsection{section}{1}{\z@}%
+  %{\Cvs \@plus.5\Cdp \@minus.2\Cdp}% 前アキ オリジナル
+  %{.5\Cvs \@plus.3\Cdp}% 後アキ オリジナル
+  {1.3\Cvs \@plus.5\Cdp \@minus.2\Cdp}% 前アキ
+  {.7\Cvs \@plus.3\Cdp}% 後アキ
+  %{\normalfont\Large\headfont\raggedright}%   % オリジナル
+  %{\normalfont\Large\headfont\raggedright ■ }% 行頭に「■」を追加する場合
+  %{\normalfont\Large\headfont\raggedright $\clubsuit$ }% 行頭にクローバーを追加する場合
+  {%
+    \normalfont\Large\headfont\raggedright%
+    \textcolor{starter@sectioncolor}{%      % 色を変える
+      \rule[-0.35zw]{\textwidth}{0.2pt}%    % 横幅いっぱいの細い下線
+      \hspace{-\textwidth}%                 % もとの位置に戻る
+      \rule[-0.35zw]{0.65zw}{1.7zw}~%       % 行頭に縦長の「■」を追加
+    }%
+  }%
+}
+
+
+%%% 小節 (Subsection) のデザインを変更（jsbook.clsからコピーして変更）
+\renewcommand{\subsection}{\@startsection{subsection}{2}{\z@}%
+    {\Cvs \@plus.5\Cdp \@minus.2\Cdp}% 前アキ
+    {.5\Cvs \@plus.3\Cdp}% 後アキ
+    {\normalfont\large\headfont}%                % デフォルト
+    %{\normalfont\large\headfont$\clubsuit$ }%   % 頭にクローバー
+}
+
+
+%%% 目次の上余白を狭める（jsbook.clsからコピー）
+\renewcommand{\tableofcontents}{%
+  \settowidth\jsc@tocl@width{\headfont\prechaptername\postchaptername}%
+  \settowidth\@tempdima{\headfont\appendixname}%
+  \ifdim\jsc@tocl@width<\@tempdima \setlength\jsc@tocl@width{\@tempdima}\fi
+  \ifdim\jsc@tocl@width<2zw \divide\jsc@tocl@width by 2 \advance\jsc@tocl@width 1zw\fi
+  \if@twocolumn
+    \@restonecoltrue\onecolumn
+  \else
+    \@restonecolfalse
+  \fi
+  %
+  %\chapter*{\contentsname}%
+  %% 章も目次も右起こしにする or しない
+  \if@openleft\cleardoublepage\else
+  \if@openright\cleardoublepage\else\clearpage\fi\fi
+  %% 章が右起こしでも、目次は右起こしにしない
+  %\clearpage
+  %
+  \plainifnotempty
+  \@makechapterhead{\contentsname}
+  %
+  \@mkboth{\contentsname}{}%
+  \@starttoc{toc}%
+  \if@restonecol\twocolumn\fi
+}
+
+
+%%% 右起こし（右ページ始まり）のときに、奥付が右ページにこないようにする。
+%%% （奥付が右ページだと、次ページである最終ページが空ページになるため）
+\renewcommand{\reviewcolophon}[0]{%
+  \clearpage
+  \pltx@cleartoleftpage   %% copied from jsbook.sty
+}
+
+
+%%% ページヘッダーの形式を変更（fancyhdr.styを使用）
+\newcommand{\pageheaderfont}{\small\gtfamily\sffamily}           % ゴシック体
+%\newcommand{\pageheaderfont}{\small\gtfamily\sffamily\bfseries} % ゴシック体、太字
+%% 紙書籍のような右起こしの場合（左ページに章タイトル、右ページに節タイトル）
+%\lhead[\pageheaderfont\leftmark]{}
+%\rhead[]{\pageheaderfont\rightmark}
+%% タブレット向けのような両起こしの場合（両ページに章タイトルと節タイトル）
+\lhead{\pageheaderfont\leftmark}
+\rhead{\pageheaderfont\rightmark}
+
+
+%%% ページ番号のスタイル
+%\newcommand{\pagenumberstyle}{\thepage}                   % 例：「1」
+%\newcommand{\pagenumberstyle}{\itshape\bfseries\thepage}  % 太字、斜体
+\newcommand{\pagenumberstyle}{--\ \thepage\ --}            % 例：「-- 1 --」
+% \newcommand{\pagenumberstyle}{\itshape --\ \thepage\ --} % 斜体
+
+%%% ページ番号をページフッタに表示（fancyhdr.styを使用）
+\fancyfoot{}                        % ページフッタをクリア
+\cfoot{\pagenumberstyle}            % ページフッタの真ん中に表示
+%\lfoot[\pagenumberstyle]{}         % 偶数ページの左下に表示
+%\rfoot[]{\pagenumberstyle}         % 奇数ページの右下に表示
+\fancypagestyle{plainhead}{         % 章タイトルページのスタイル
+  \fancyhead{}                        % ページヘッダなし
+  \fancyfoot{}                        % ページフッタをクリア
+  \cfoot{\pagenumberstyle}            % ページフッタの真ん中に表示
+  %\lfoot[\pagenumberstyle]{}         % 偶数ページの左下に表示
+  %\rfoot[]{\pagenumberstyle}         % 奇数ページの右下に表示
+  \renewcommand{\headrulewidth}{0pt}  % ページヘッダの区切り線をなくす
+  \renewcommand{\footrulewidth}{0pt}  % ページフッタの区切り線をなくす
+}
+
+
+%%% 現在位置に画像が入りきらない場合、画像は次のページに回される。
+%%% その際、現在位置に大きなスペースが空くのを防ぐために、
+%%% 後続のテキストを現在位置に流し込むようにする。
+\renewenvironment{reviewimage}[1][H]{%  % 現在位置にスペースが空く（要float.sty）
+%\renewenvironment{reviewimage}[1][h]{%  % 現在位置に後続テキストを流し込む
+  \vspace{0.8zw}      % 画像上の余白を調整（少し増やす）
+  \begin{figure}[#1]
+    %\begin{center}   % center環境は余分な余白がつくので使わない
+    \centering        % \centeringを使うと余分な余白がつかない
+}{%
+    %\end{center}
+  \end{figure}
+  \vspace{-0.8zw}     % 画像下の余白を調整（少し減らす）
+}
+%
+\renewenvironment{reviewdummyimage}{%
+  \begin{reviewimage}
+    \begin{alltt}
+}{%
+    \end{alltt}
+  \end{reviewimage}
+}
+
+
+%%% コラムが複数のページにまたがるとき、次のページに続いていることが
+%%% わかるようにするために、ページ境界では上下の線を引かない。
+\renewenvironment{reviewcolumn}{%
+     %\begin{framed}
+     \begin{oframed}
+  }{%
+     %\end{framed}
+     \end{oframed}
+  \vspace{2zw}}
+
+%%% コラムのタイトルを変更する
+\renewcommand{\reviewcolumnhead}[2]{%
+  %{\noindent\large ■コラム: #2}%  % オリジナル
+  %{\noindent\large\gtfamily\sffamily\bfseries ■コラム：#2}%  % 太字のゴシック
+  {\noindent\large\gtfamily\sffamily\bfseries 【コラム】#2}%  % 太字のゴシック
+  \vspace{2mm}%
+}
+
+
+%%% 導入文（リード文）
+\newenvironment{starterlead}{%
+  \begin{quotation}%     % または \begin{abstract}
+}{%
+  \end{quotation}%       % または \end{abstract}
+}
+
+
+%%% 章 (Chaper) の概要
+%%% （導入文（リード文）と違うことに注意）
+\newenvironment{starterabstract}{%   % jsbook.clsからコピーして編集
+  %\begin{abstract}%
+  \begin{list}{}{%
+    \listparindent=1zw
+    \itemindent=\listparindent
+    \rightmargin=2.5zw     % 右の余白を2.5文字分広げる (default: 0pt)
+    \leftmargin=2.5zw      % 左の余白を2.5文字分広げる (default: 5pt)
+  }\item[]%
+    \gtfamily\sffamily%    % ゴシック体
+    \small%                % 少し小さめ
+}{%
+  %\end{abstract}%
+  \end{list}%
+  \vspace{\baselineskip}%
+}
+
+
+%%% 引用（複数段落に対応）
+\newenvironment{starterquote}{%
+  \begin{starter@leftbar}{3pt}{starter@quotecolor}%
+}{%
+  \end{starter@leftbar}%
+}
+%
+\newenvironment{starter@leftbar}[2]{%   % #1: 太さ、#2: 色
+  %% framed.sty の機能を使って、文章の左側に縦棒を入れる
+  \def\FrameCommand{\textcolor{#2}{\vrule width #1} \hspace{10pt}}%
+  \MakeFramed{\advance\hsize-\width \FrameRestore}%
+}{%
+  \endMakeFramed%
+}
+
+
+%%% ノート
+\newenvironment{starternote}[1]{%
+  \par\vspace{\baselineskip}%     % 一行空ける
+  \begin{starter@note}{#1}
+}{%
+  \end{starter@note}
+  \par\vspace{\baselineskip}%     % 一行空ける
+}
+\newenvironment{starter@note}[1]{%
+  %% //list や //emlist で使う環境を上書き
+  \renewenvironment{shaded}{%
+    \begin{starter@note@codeblock}{shadecolor}
+  }{%
+    \end{starter@note@codeblock}%
+  }%
+  %% //cmd や //terminal で使う環境を上書き
+  \renewenvironment{shadedb}{%
+    \begin{starter@note@codeblock}{shadecolorb}
+  }{%
+    \end{starter@note@codeblock}%
+  }%
+  %% キャプションのスペースを調整
+  \renewcommand{\starter@listcaptionsep}{%
+    \vspace*{-0.3zw}%
+  }
+  %% 2.5行分のスペースがなければ改行
+  \needspace{2.5zw}%
+  %% 本文を左右3文字分狭くする
+  %% （\textwidthを短くしても狭くならないので、かわりにlist環境を使う。
+  %%   詳しくは https://texfaq.org/FAQ-chngmargonfly を参照。）
+  \begin{list}{}{%
+    \setlength{\topsep}{0pt}%         % これがないと、なぜか//listや//cmdの最後に1行空きが入る
+    \setlength{\partopsep}{0.25zw}%   % 箇条書きの上下に少しスペースを入れる
+    \setlength{\leftmargin}{3zw}%     % 左余白を全角3文字分増やす
+    \setlength{\rightmargin}{3zw}%    % 右余白を全角3文字分増やす
+    \setlength{\listparindent}{1zw}%  % 段落先頭のインデント
+    %\setlength{\itemindent}{1zw}%
+    %\setlength{\parsep}{\parskip}%
+  }%
+    \item[]
+    \begin{starter@note@block}{#1}
+}{%
+    \end{starter@note@block}
+  \end{list}%
+  \par%
+}
+%%% ノートの中でソースコードやターミナルを使うための環境
+\newenvironment{starter@note@codeblock}[1]{%
+  \addtolength{\textwidth}{-8.4zw}%  % why not '-6zw'?
+  \vspace{-2mm}%
+  \noindent%
+  \hspace{0.8zw}%
+  \begin{minipage}[t]{\textwidth}% % 本文の横幅を短く制限する（ただし途中で改ページ不可）
+    \def\FrameCommand{\fboxsep=0.65\FrameSep \colorbox{#1}}%
+    \MakeFramed {\FrameRestore}%
+      \vspace{2.5mm}%
+}{%
+      \vspace{1.5mm}%
+    \endMakeFramed%
+  \end{minipage}%
+  \medskip%
+}
+%%% ノートの構造
+\newenvironment{starter@note@block}[1]{%
+  \starter@note@line%             % 点線を引く
+  \par%                           % 段落を区切る
+  \vspace{1mm}%                   % 縦方向のスペースを少し空ける
+  \ifx#1\empty\else
+    \noindent%                    % インデントしない
+    \starter@note@title{#1}%      % タイトルを表示
+    \vspace{1mm}%                 % 縦方向のスペースを少し空ける
+    \par%                         % 段落を区切る
+  \fi
+  \starter@note@font%             % ノート本文のフォント
+}{%
+  \vspace{-1mm}%                  % 縦方向のスペースを少し狭める
+  \par%                           % 段落を区切る
+  \starter@note@line%             % 点線を引く
+}
+%%% ノートの上下に入る点線
+\newcommand{\starter@note@line}[1][-0.2zw]{%
+  \noindent%                      % インデントなし
+  \hspace{#1}%                    % \dotfillの先頭に少し空白が入るので、その対策
+  {\rmfamily\bfseries\large\dotfill}% 丸点で少し太めの点線
+}
+%%% ノートのフォント
+\newcommand{\starter@note@font}{%
+  \gtfamily\sffamily              % ゴシック体
+  \small                          % フォントを小さめに
+}
+%%% ノートのタイトル
+\newcommand{\starter@note@title}[1]{{%
+  \gtfamily\sffamily\bfseries     % 太字のゴシック体
+  \normalsize                     % 文字を通常の大きさにする（\smallにしない）
+  #1                              % タイトルを表示
+}}
+%%% ノートタイトルの接頭辞をカスタマイズする
+%\renewcommand{\starter@note@title}[1]{{%
+%  \gtfamily\sffamily\bfseries\normalsize ■ノート：#1
+%}}
+
+%%% ノートの、以前の定義（コメントアウトすれば使えるはず）
+%\renewenvironment{starter@note}[1]{%
+%  \begin{boxnote}                 % \usepackage{ascmac}が必要
+%    \setlength{\parindent}{1zw}   % 段落の先頭をインデント
+%    \vspace{-1mm}                 % 余白を調整（1mm減らす）
+%    \ifempty{#1}\else             % タイトルが指定されていたら
+%      \noindent                   %   タイトルはインデントしない
+%      \starter@note@title{#1}     %   タイトルを表示
+%      \par                        %   タイトルと本文は段落を分ける
+%      \vspace{1mm}                %   余白を調整（1mm増やす）
+%    \fi
+%}{%
+%  \end{boxnote}
+%}

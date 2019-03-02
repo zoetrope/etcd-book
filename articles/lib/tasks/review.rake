@@ -1,38 +1,15 @@
-# Copyright (c) 2006-2018 Minero Aoki, Kenshi Muto, Masayoshi Takahashi, Masanori Kado.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-
 require 'fileutils'
 require 'rake/clean'
 
-BOOK = ENV['REVIEW_BOOK'] || 'book'
+BOOK = 'book'
 BOOK_PDF = BOOK + '.pdf'
 BOOK_EPUB = BOOK + '.epub'
-CONFIG_FILE = ENV['REVIEW_CONFIG_FILE'] || 'config.yml'
-CATALOG_FILE = ENV['REVIEW_CATALOG_FILE'] || 'catalog.yml'
-WEBROOT = ENV['REVIEW_WEBROOT'] || 'webroot'
-TEXTROOT = BOOK + '-text'
-TOPROOT = BOOK + '-text'
+CONFIG_FILE = 'config.yml'
+WEBROOT = 'webroot'
 
 def build(mode, chapter)
   sh "review-compile --target=#{mode} --footnotetext --stylesheet=style.css #{chapter} > tmp"
-  mode_ext = { 'html' => 'html', 'latex' => 'tex', 'idgxml' => 'xml', 'top' => 'txt', 'plaintext' => 'txt' }
+  mode_ext = { 'html' => 'html', 'latex' => 'tex', 'idgxml' => 'xml' }
   FileUtils.mv 'tmp', chapter.gsub(/re\z/, mode_ext[mode])
 end
 
@@ -69,34 +46,84 @@ task all: %i[pdf epub]
 desc 'generate PDF file'
 task pdf: BOOK_PDF
 
-desc 'generate static HTML file for web'
+desc 'generate stagic HTML file for web'
 task web: WEBROOT
-
-desc 'generate text file (without decoration)'
-task plaintext: TEXTROOT do
-  sh "review-textmaker -n #{CONFIG_FILE}"
-end
-
-desc 'generate (decorated) text file'
-task text: TOPROOT do
-  sh "review-textmaker #{CONFIG_FILE}"
-end
 
 desc 'generate EPUB file'
 task epub: BOOK_EPUB
 
-IMAGES = FileList['images/**/*']
-OTHERS = ENV['REVIEW_DEPS'] || []
-SRC = FileList['./**/*.re', '*.rb'] + [CONFIG_FILE, CATALOG_FILE] + IMAGES + FileList[OTHERS]
-SRC_EPUB = FileList['*.css']
-SRC_PDF = FileList['layouts/*.erb', 'sty/**/*.sty']
+SRC = FileList['*.re'] + [CONFIG_FILE]
 
-file BOOK_PDF => SRC + SRC_PDF do
+### original
+#file BOOK_PDF => SRC do
+#  FileUtils.rm_rf [BOOK_PDF, BOOK, BOOK + '-pdf']
+#  sh "review-pdfmaker #{CONFIG_FILE}"
+#end
+file BOOK_PDF => SRC do
+  require 'review'
+  require 'review/pdfmaker'
+  ReVIEW::PDFMaker.class_eval do
+    ## コンパイルメッセージを減らすために、uplatexコマンドをバッチモードで起動する。
+    ## エラーがあったら、バッチモードにせずに再コンパイルしてエラーメッセージを出す。
+    def system_or_raise(*args)
+      texcommand = @config['texcommand']   # ex: "uplatex"
+      texoptions = @config['texoptions']   # ex: "-halt-on-error -file-line-error"
+      latex = "#{texcommand} #{texoptions}"
+      if args == ["#{latex} book.tex"]     # when latex command
+        ## invoke latex command with batchmode option in order to suppress
+        ## compilation message (in other words, to be quiet mode).
+        latex += " -interaction=batchmode"
+        ok = _run_command("#{latex} book.tex")
+        ## latex command with batchmode option doesn't show any error,
+        ## therefore we must invoke latex command again without batchmode option
+        ## in order to show error.
+        return if ok
+        $stderr.puts "*\n* latex command failed; retry without batchmode option to show error.\n*"
+      end
+      _run_command(*args) or raise("failed to run command: #{args.join(' ')}")
+    end
+    def _run_command(*args)
+      puts ""
+      puts "[review-pdfmaker]$ #{args.join(' ')}"
+      return Kernel.system(*args)
+    end
+    ## rake pdf && open pdf をするたびに新しいウィンドウが開いてしまうのを防ぐ。
+    ## （技術解説：PDFファイルを再生成してもi-nodeが変わらないようにする。）
+    #alias __orig_generate_pdf generate_pdf
+    #def generate_pdf(yamlfile)
+    #  pdffile = pdf_filepath()
+    #  _keep_inode(pdffile) { __orig_generate_pdf(yamlfile) }
+    #end
+    #def _keep_inode(file, suffix="_bkup_")
+    #  return yield unless File.file?(file)
+    #  bkup = file + suffix
+    #  File.rename(file, bkup)      # ex: book.pdf -> book.pdf_bkup_
+    #  begin
+    #    ret = yield                # generate book.pdf
+    #    return ret unless File.file?(file)
+    #    binary = File.read(file, binmode: true)  # read from book.pdf
+    #    File.write(bkup, binary, binmode: true)  # write into book.pdf_bkup_
+    #    File.rename(bkup, file)    # ex: book.pdf_bkup_ -> book.pdf
+    #    return ret
+    #  rescue
+    #    File.unlink(bkup) if File.exist?(bkup)
+    #  end
+    #end
+  end
+  #
   FileUtils.rm_rf [BOOK_PDF, BOOK, BOOK + '-pdf']
-  sh "review-pdfmaker #{CONFIG_FILE}"
+  begin
+    ReVIEW::PDFMaker.execute(CONFIG_FILE)
+  rescue RuntimeError => ex
+    if ex.message =~ /^failed to run command:/
+      abort "*\n* ERROR (review-pdfmaker):\n*  #{ex.message}\n*"
+    else
+      raise
+    end
+  end
 end
 
-file BOOK_EPUB => SRC + SRC_EPUB do
+file BOOK_EPUB => SRC do
   FileUtils.rm_rf [BOOK_EPUB, BOOK, BOOK + '-epub']
   sh "review-epubmaker #{CONFIG_FILE}"
 end
@@ -106,8 +133,4 @@ file WEBROOT => SRC do
   sh "review-webmaker #{CONFIG_FILE}"
 end
 
-file TEXTROOT => SRC do
-  FileUtils.rm_rf [TEXTROOT]
-end
-
-CLEAN.include([BOOK, BOOK_PDF, BOOK_EPUB, BOOK + '-pdf', BOOK + '-epub', WEBROOT, 'images/_review_math', TEXTROOT])
+CLEAN.include([BOOK, BOOK_PDF, BOOK_EPUB, BOOK + '-pdf', BOOK + '-epub', WEBROOT, 'images/_review_math'])
