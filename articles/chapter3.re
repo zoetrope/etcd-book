@@ -4,10 +4,17 @@
 
 == 証明書
 
+== ユーザー
+
 == スナップショット
 
 == コンパクション
 
-== etcd operator
+== アップグレード
 
-== etcdadm
+== その他
+* metrics
+* cors
+* discover
+* pprof
+* proxy

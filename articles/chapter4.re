@@ -1,9 +1,7 @@
-= Raft
+= ツール
 
-== 分散合意アルゴリズム
+== etcd-dump-logs
 
-== Raft Learner
+== etcd operator
 
-== Alloyで仕様を検証してみよう
-
-== Jepsen Testで実装を検証してみよう
+== etcdadm
