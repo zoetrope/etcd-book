@@ -36,7 +36,7 @@ end
 desc 'preproc all'
 task :preproc do
   Dir.glob('*.re').each do |file|
-    sh "review-preproc --replace #{file}"
+    sh "review-preproc --replace --tabwidth=4 #{file}"
   end
 end
 
