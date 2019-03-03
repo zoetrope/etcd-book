@@ -14,27 +14,9 @@ Docker version 18.06.1-ce, build e68fc7a
 次にetcdを起動します。
 
 //cmd{
-$ docker run -p 2379:2379 --name etcd \
-    -v etcd-data:/var/lib/etcd \
-    quay.io/cybozu/etcd:3.3 \
-      --listen-client-urls http://0.0.0.0:2379 \
-      --advertise-client-urls http://0.0.0.0:2379
+$ docker run --name etcd \
+    quay.io/coreos/etcd:v3.3.12
 //}
-
-Dockerに以下の起動オプションを指定します。
-
-: -p 2379:2379
-    コンテナ外からetcdのAPIを呼び出せるように2379番ポートをホストにバインドしています。
-: -v etcd-data:/var/lib/etcd
-    etcd-dataというボリュームを作成し、コンテナの@<code>{/var/lib/etcd}にバインドしています。これによりコンテナを終了してもetcdのデータは消えません。
-
-etcdに以下の起動オプションを指定します。
-
-: --listen-client-urls
-    etcdがクライアントからのリクエストを受け付けるURLを指定します。
-: --advertise-client-urls
-    クライアント用のURLをクラスタの他のメンバーに伝えるために指定します。
-    現在はクラスタを組んでいませんが、@<code>{--listen-client-urls}を指定した場合は必ずこのオプションも指定する必要があります。
 
 以下のようなログが出力されればetcdの起動は成功です@<fn>{insecure}。
 
@@ -51,30 +33,25 @@ etcdに以下の起動オプションを指定します。
 2019-03-03 03:53:36.625491 N | embed: serving insecure client requests on [::]:2379, this is strongly discouraged!
 //}
 
-
-次にetcdctlを用意します。etcdctlはetcdとやり取りするためのコマンドラインツールです@<fn>{etcdcurl}。
-以下のコマンドを実行するとカレントディレクトリにetcdctlがコピーされます。
+次にetcdctlを使ってみましょう。etcdctlはetcdとやり取りするためのコマンドラインツールです@<fn>{etcdcurl}。
 
 //footnote[etcdcurl][etcdのAPIはetcdctlを利用せずcurlなどでアクセスすることも可能です。]
 
 //cmd{
-$ docker run --rm -u root:root \
-    --entrypoint /usr/local/etcd/install-tools \
-    --mount type=bind,src=$(pwd),target=/host \
-    quay.io/cybozu/etcd:3.3
-//}
-
-ではさっそくetcdctlを利用して、etcdの健康状態をチェックしてみましょう。
-
-//cmd{
-$ ETCDCTL_API=3 ./etcdctl endpoint health
-127.0.0.1:2379 is healthy: successfully committed proposal: took = 915.187µs
+$ docker exec etcd etcdctl endpoint health
+127.0.0.1:2379 is healthy: successfully committed proposal: took = 1.154489ms
 //}
 
 現在のetcdはAPIのバージョンとしてv2とv3をサポートしており、etcdctlはデフォルトでAPI v2を利用するようになっています@<fn>{etcdv3}。
 API v3を利用するには環境変数@<code>{ETCDCTL_API=3}を指定する必要があります。
 
 //footnote[etcdv3][etcd 3.4から、デフォルトでAPI v3が利用されるようになります。]
+
+毎回長いコマンドを打ち込むのは面倒なので、以下のようなエイリアスを用意しておくと便利でしょう。
+
+//cmd{
+$ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl'
+//}
 
 == etcdにデータを読み書きしてみよう
 
