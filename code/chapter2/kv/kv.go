@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -17,14 +18,25 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	err = write(client)
+
+	//#@@range_begin(write)
+	_, err = client.Put(context.Background(), "/mykey", "value")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	err = read(client)
+	//#@@range_end(write)
+
+	//#@@range_begin(read)
+	resp, err := client.Get(context.Background(), "/mykey")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	if resp.Count == 0 {
+		fmt.Println("not found")
+		os.Exit(1)
+	}
+	fmt.Println(string(resp.Kvs[0].Value))
+	//#@@range_end(read)
 }

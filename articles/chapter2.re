@@ -25,19 +25,12 @@ func main() {
         os.Exit(1)
     }
 
-    key := "test"
-    ctx := context.Background()
-
-    resp, err := client.Get(ctx, key)
+    resp, err := client.Status(context.Background(), "localhost:2379")
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
     }
-    if resp.Count == 0 {
-        fmt.Printf("key not found: %s\n", key)
-        os.Exit(1)
-    }
-    fmt.Println(resp.Kvs[0].Value)
+    fmt.Printf("%#v\n", resp)
 }
 #@end
 //}
@@ -46,51 +39,27 @@ func main() {
 == KV
 
 //listnum[kv-write][データの書き込み]{
-#@mapfile(../code/chapter2/kv/write.go)
-package main
-
-import (
-    "context"
-
-    "github.com/coreos/etcd/clientv3"
-)
-
-func write(client *clientv3.Client) error {
-    key := "test"
-    ctx := context.Background()
-    _, err := client.Put(ctx, key, "value")
+#@maprange(../code/chapter2/kv/kv.go,write)
+    _, err = client.Put(context.Background(), "/mykey", "value")
     if err != nil {
-        return err
+        fmt.Println(err)
+        os.Exit(1)
     }
-    return nil
-}
 #@end
 //}
 
 //listnum[kv-read][データの読み込み]{
-#@mapfile(../code/chapter2/kv/read.go)
-package main
-
-import (
-    "context"
-    "fmt"
-
-    "github.com/coreos/etcd/clientv3"
-)
-
-func read(client *clientv3.Client) error {
-    key := "test"
-    ctx := context.Background()
-    resp, err := client.Get(ctx, key)
+#@maprange(../code/chapter2/kv/kv.go,read)
+    resp, err := client.Get(context.Background(), "/mykey")
     if err != nil {
-        return err
+        fmt.Println(err)
+        os.Exit(1)
     }
     if resp.Count == 0 {
-        return err
+        fmt.Println("not found")
+        os.Exit(1)
     }
-    fmt.Println(resp.Kvs[0].Value)
-    return nil
-}
+    fmt.Println(string(resp.Kvs[0].Value))
 #@end
 //}
 

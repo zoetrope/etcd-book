@@ -19,17 +19,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	key := "test"
-	ctx := context.Background()
-
-	resp, err := client.Get(ctx, key)
+	resp, err := client.Status(context.Background(), "localhost:2379")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	if resp.Count == 0 {
-		fmt.Printf("key not found: %s\n", key)
-		os.Exit(1)
-	}
-	fmt.Println(resp.Kvs[0].Value)
+	fmt.Printf("%#v\n", resp)
 }
