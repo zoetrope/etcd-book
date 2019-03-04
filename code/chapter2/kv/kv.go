@@ -20,7 +20,7 @@ func main() {
 	}
 
 	//#@@range_begin(write)
-	_, err = client.Put(context.Background(), "/mykey", "value")
+	_, err = client.Put(context.TODO(), "/mykey", "value")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -28,7 +28,7 @@ func main() {
 	//#@@range_end(write)
 
 	//#@@range_begin(read)
-	resp, err := client.Get(context.Background(), "/mykey")
+	resp, err := client.Get(context.TODO(), "/mykey")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
