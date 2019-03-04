@@ -51,12 +51,12 @@ $ docker run --name etcd \
 //footnote[etcdcurl][etcdのAPIはetcdctlを利用せずcurlなどでアクセスすることも可能です。]
 
 //cmd{
-$ docker exec etcd etcdctl endpoint health
+$ docker exec -e "ETCDCTL_API=3" etcd etcdctl endpoint health
 127.0.0.1:2379 is healthy: successfully committed proposal: took = 1.154489ms
 //}
 
-現在のetcdはAPIのバージョンとしてv2とv3をサポートしており、etcdctlはデフォルトでAPI v2を利用するようになっています@<fn>{etcdv3}。
-API v3を利用するには環境変数@<code>{ETCDCTL_API=3}を指定する必要があります。
+現在のetcdはAPIのバージョンとしてv2とv3をサポートしており、etcdctlはデフォルトでAPI v2を利用するようになっています。
+API v3を利用するには環境変数@<code>{ETCDCTL_API=3}を指定する必要があります@<fn>{etcdv3}。
 
 //footnote[etcdv3][etcd 3.4から、デフォルトでAPI v3が利用されるようになります。]
 
