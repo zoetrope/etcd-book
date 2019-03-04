@@ -55,4 +55,44 @@ $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl'
 
 == etcdにデータを読み書きしてみよう
 
-* etcdのキーの話
+=== etcdのキーの話
+
+=== VersionとRevisionの話
+
+etcdctlで値を取得する時に@<code>{--write-out=json}を指定すると詳細な情報を表示することができます@<fn>{base64}。
+
+//footnote[base64][このときのキーとバリューの値はBASE64形式でエンコードされています。]
+
+//terminal{
+$ etcdctl get foo --write-out=json | jq
+{
+  "header": {
+    "cluster_id": 14841639068965180000,
+    "member_id": 10276657743932975000,
+    "revision": 2,
+    "raft_term": 2
+  },
+  "kvs": [
+    {
+      "key": "Zm9v",
+      "create_revision": 2,
+      "mod_revision": 2,
+      "version": 1,
+      "value": "YmFy"
+    }
+  ],
+  "count": 1
+}
+//}
+
+: revision
+    etcdのリビジョン番号。etcdに何らかの変更(キーの追加、変更、削除)が加えられると値が1増える。
+: create_revision
+    このキーが作成されたときのリビジョン番号。
+: mod_revision
+    このキーの内容が変更されたときのリビジョン番号。
+: version
+    このキーのバージョン。このキーに変更が加えられると値が1増える。
+
+
+
