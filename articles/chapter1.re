@@ -2,18 +2,30 @@
 
 == etcdとは
 
-分散型のキーバリューストア。
-もともとはCoreOS社がContainer Linuxにおいて、複数のホスト間で設定を共有するための仕組みとして開発していました。
-現在はCNCFに寄贈され、オープンソースコミュニティとして開発が進められています。
+etcdは分散型のキーバリューストアです。
+もともとは複数のホスト間で協調しながらOSのアップグレードをおこなうための機能として、CoreOS社がContainer Linux用に開発していました。
+2018年にCNCFに寄贈され、現在はオープンソースコミュニティにおいて開発が進められています。
 
-その特徴として、強い一貫性、
-また、ウォッチ、リース、リーダーエレクションを始めとする機能をライブラリ的に利用することが可能なため、
-分散システムのバックエンドとして利用されることもある。
-Kubernetesなどのバックエンドとして広く利用されている。
+etcdには以下のような特徴があります。
 
-一方で、大きなデータは取り扱えない(クラスタ全体で扱えるデータサイズはデフォルトで2GB、最大でも8GB)。
-メンバーの数を増やしてもスケールさせることができない。
-そのため、大容量のデータを扱う用途には向かない。小さな設定などを共有したりするのに向いている。
+* 高可用性(High Availability)
+* 強い一貫性(Strong Consistency)
+
+etcdは高可用な構成でクラスタを構築することができます。
+例えば5台のサーバーを使ってetcdクラスタを構築した場合、最大2台のサーバーが故障したとしてもクラスタの機能を正常に提供し続けることが可能です。
+
+etcdは強い一貫性モデルを採用しています。
+すなわち、etcdクラスタに対して何らかのデータの書き込みに成功すると、その後にそのデータを読み出した場合は必ず書き込んだ値が読み込まれるということです。
+
+このような高可用性と強い一貫性を実現するために、etcdはRaftという分散合意(Consensus)アルゴリズムに基づいて実装がおこなわれています。
+
+また、Watch(値の変更監視)、Lease(キーの有効期限)、Leader Electionなど機能をライブラリ的に利用する仕組みを提供しています。
+
+一方で、大きなデータは取り扱うことができず(クラスタ全体で扱えるデータサイズはデフォルトで2GB、最大8GB)、
+メンバーの数を増やしても性能を向上させることはできないため、大容量のデータを高速に扱うような用途には向いていません。
+
+以上のような特徴を持つことから、分散システムのバックエンドとして使いやすいと評価され、
+Kubernetesを始め、CoreDNS、Vault、Calicoなど様々なシステムで採用されています。
 
 == etcdを起動してみよう
 
@@ -28,7 +40,13 @@ Docker version 18.06.1-ce, build e68fc7a
 
 //cmd{
 $ docker run --name etcd \
-    quay.io/coreos/etcd:v3.3.12
+    -p 2379:2379 \
+    --volume=etcd-data:/etcd-data \
+    --name etcd quay.io/coreos/etcd:v3.3.12 \
+    /usr/local/bin/etcd \
+      --data-dir=/etcd-data \
+      --advertise-client-urls http://0.0.0.0:2379 \
+      --listen-client-urls http://0.0.0.0:2379
 //}
 
 以下のようなログが出力されればetcdの起動は成功です@<fn>{insecure}。
@@ -51,7 +69,7 @@ $ docker run --name etcd \
 //footnote[etcdcurl][etcdのAPIはetcdctlを利用せずcurlなどでアクセスすることも可能です。]
 
 //cmd{
-$ docker exec -e "ETCDCTL_API=3" etcd etcdctl endpoint health
+$ docker exec -e "ETCDCTL_API=3" etcd etcdctl --endpoint=http://127.0.0.1:2379 endpoint health
 127.0.0.1:2379 is healthy: successfully committed proposal: took = 1.154489ms
 //}
 
@@ -63,12 +81,12 @@ API v3を利用するには環境変数@<code>{ETCDCTL_API=3}を指定する必�
 毎回長いコマンドを打ち込むのは面倒なので、以下のようなエイリアスを用意しておくと便利でしょう。
 
 //cmd{
-$ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl'
+$ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl --endpoint=http://127.0.0.1:2379'
 //}
 
 == etcdにデータを読み書きしてみよう
 
-=== etcdのキーの話
+=== キースペース
 
 etcd v2では、キーをファイルシステムのように/で区切って階層的に管理していました。
 etcd v3では、キーを単一のバイト配列としてフラットなキースペースで管理するように変わりました。
@@ -82,8 +100,10 @@ namepaceや、アクセス権の
 しかし、慣例的に/で区切って管理することが多くなっています。
 
 
-例えばKubernetesでは/registry/から始まるキーを使います。
+例えばKubernetesでは/registry/から始まるキーを使います。(歴史的経緯で一部minionから始まるキーもある)
 
+* /registry/pods/default/mypod
+* /registry/services/kube-system/default
 
 === RevisionとVersion
 
