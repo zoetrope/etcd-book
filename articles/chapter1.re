@@ -8,8 +8,8 @@ etcdは分散型のキーバリューストアです。
 
 etcdには以下のような特徴があります。
 
-* 高可用性(High Availability)
-* 強い一貫性(Strong Consistency)
+ * 高可用性(High Availability)
+ * 強い一貫性(Strong Consistency)
 
 etcdは高可用な構成でクラスタを構築することができます。
 例えば5台のサーバーを使ってetcdクラスタを構築した場合、最大2台のサーバーが故障したとしてもクラスタの機能を正常に提供し続けることが可能です。
@@ -102,8 +102,8 @@ namepaceや、アクセス権の
 
 例えばKubernetesでは/registry/から始まるキーを使います。(歴史的経緯で一部minionから始まるキーもある)
 
-* /registry/pods/default/mypod
-* /registry/services/kube-system/default
+ * /registry/pods/default/mypod
+ * /registry/services/kube-system/default
 
 === RevisionとVersion
 

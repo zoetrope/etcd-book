@@ -43,8 +43,8 @@ etcdに以下の起動オプションを指定します。
 == アップグレード
 
 == その他
-* metrics
-* cors
-* discover
-* pprof
-* proxy
+ * metrics
+ * cors
+ * discover
+ * pprof
+ * proxy

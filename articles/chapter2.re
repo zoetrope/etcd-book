@@ -40,7 +40,7 @@ func main() {
 
 //listnum[kv-write][データの書き込み]{
 #@maprange(../code/chapter2/kv/kv.go,write)
-    _, err = client.Put(context.Background(), "/mykey", "value")
+    _, err = client.Put(context.TODO(), "/mykey", "value")
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
@@ -50,7 +50,7 @@ func main() {
 
 //listnum[kv-read][データの読み込み]{
 #@maprange(../code/chapter2/kv/kv.go,read)
-    resp, err := client.Get(context.Background(), "/mykey")
+    resp, err := client.Get(context.TODO(), "/mykey")
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
