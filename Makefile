@@ -16,3 +16,8 @@ start-etcd:
 			--data-dir=/etcd-data \
 			--advertise-client-urls http://0.0.0.0:2379 \
 			--listen-client-urls http://0.0.0.0:2379
+
+destroy:
+	docker rm etcd
+	docker volume rm etcd-data
+

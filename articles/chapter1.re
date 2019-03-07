@@ -68,7 +68,7 @@ $ docker run --name etcd \
 
 //footnote[etcdcurl][etcdのAPIはetcdctlを利用せずcurlなどでアクセスすることも可能です。]
 
-//cmd{
+//terminal{
 $ docker exec -e "ETCDCTL_API=3" etcd etcdctl --endpoint=http://127.0.0.1:2379 endpoint health
 127.0.0.1:2379 is healthy: successfully committed proposal: took = 1.154489ms
 //}
@@ -80,11 +80,14 @@ API v3を利用するには環境変数@<code>{ETCDCTL_API=3}を指定する必�
 
 毎回長いコマンドを打ち込むのは面倒なので、以下のようなエイリアスを用意しておくと便利でしょう。
 
-//cmd{
+//terminal{
 $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl --endpoint=http://127.0.0.1:2379'
 //}
 
 == etcdにデータを読み書きしてみよう
+
+
+
 
 === キースペース
 
@@ -110,11 +113,15 @@ namepaceや、アクセス権の
 etcdにおける重要な要素の一つとしてRevisionがあります。
 
 etcdctlで値を取得する時に@<code>{--write-out=json}を指定すると詳細な情報を表示することができます@<fn>{base64}。
+/key1に値を書き込み、詳細な情報を取得してみましょう@<fn>{jq}。
 
 //footnote[base64][このときのキーとバリューの値はBASE64形式でエンコードされています。]
+//footnote[jq][JSONの整形のためにjqを利用します。@<href>{https://stedolan.github.io/jq/}]
 
 //terminal{
-$ etcdctl get foo --write-out=json | jq
+$ etcdctl put /key1 value1
+OK
+$ etcdctl get /key1 --write-out=json | jq
 {
   "header": {
     "cluster_id": 14841639068965180000,
@@ -124,16 +131,18 @@ $ etcdctl get foo --write-out=json | jq
   },
   "kvs": [
     {
-      "key": "Zm9v",
+      "key": "L2tleTE=",
       "create_revision": 2,
       "mod_revision": 2,
       "version": 1,
-      "value": "YmFy"
+      "value": "dmFsdWUx"
     }
   ],
   "count": 1
 }
 //}
+
+取得した情報の中に、revisionやversionなどのフィールドが見つかると思います。
 
 : revision
     etcdのリビジョン番号。クラスタ全体で一つの値が利用される。etcdに何らかの変更(キーの追加、変更、削除)が加えられると値が1増える。
@@ -143,3 +152,55 @@ $ etcdctl get foo --write-out=json | jq
     このキーの内容が変更されたときのリビジョン番号。
 : version
     このキーのバージョン。このキーに変更が加えられると値が1増える。
+
+次に/key1の値を更新してみましょう。revision, mod_revision, versionの値が1つ増え、create_revisionがそのままの値になっています。
+
+//terminal{
+$ etcdctl put /key1 value2
+OK
+$ etcdctl get /key1 --write-out=json \
+    | jq '(.header | {revision}), (.kvs[] | { create_revision, mod_revision, version})'
+{
+  "revision": 3
+}
+{
+  "create_revision": 2,
+  "mod_revision": 3,
+  "version": 2
+}
+//}
+
+次に別のキー/key2に値を書き込んでみましょう。このときの/key1の情報を見ると、revisionは増えているものの
+create_revision, mod_revision, versionは値が変化していません。
+
+//terminal{
+$ etcdctl put /key2 value3
+OK
+$ etcdctl get /key1 --write-out=json \
+    | jq '(.header | {revision}), (.kvs[] | { create_revision, mod_revision, version})'
+{
+  "revision": 4
+}
+{
+  "create_revision": 2,
+  "mod_revision": 3,
+  "version": 2
+}
+//}
+
+一方、/key2の情報を見ると、revisionは/key1と同じ値になっていますが、versionは新たに1になっていることがわかります。
+
+//terminal{
+$ etcdctl get /key2 --write-out=json \
+    | jq '(.header | {revision}), (.kvs[] | { create_revision, mod_revision, version})'
+{
+  "revision": 4
+}
+{
+  "create_revision": 4,
+  "mod_revision": 4,
+  "version": 1
+}
+//}
+
+ここで説明したrevisionは、後ほどのトランザクションやウォッチの
