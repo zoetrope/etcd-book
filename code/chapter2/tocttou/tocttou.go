@@ -24,19 +24,15 @@ func main() {
 	defer client.Close()
 
 	//#@@range_begin(tocttou)
+	addValue := func(d int) {
+		resp, _ := client.Get(context.TODO(), "/chapter2/tocttou")
+		value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
+		value += d
+		client.Put(context.TODO(), "/chapter2/tocttou", strconv.Itoa(value))
+	}
 	client.Put(context.TODO(), "/chapter2/tocttou", "10")
-	go func() {
-		resp, _ := client.Get(context.TODO(), "/chapter2/tocttou")
-		value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
-		value += 5
-		client.Put(context.TODO(), "/chapter2/tocttou", strconv.Itoa(value))
-	}()
-	go func() {
-		resp, _ := client.Get(context.TODO(), "/chapter2/tocttou")
-		value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
-		value -= 3
-		client.Put(context.TODO(), "/chapter2/tocttou", strconv.Itoa(value))
-	}()
+	go addValue(5)
+	go addValue(-3)
 	time.Sleep(1 * time.Second)
 	resp, _ := client.Get(context.TODO(), "/chapter2/tocttou")
 	fmt.Println(string(resp.Kvs[0].Value))
