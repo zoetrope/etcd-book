@@ -16,7 +16,8 @@ services:
       - --listen-peer-urls=http://0.0.0.0:2380
       - --advertise-client-urls=http://etcd1:2379
       - --listen-client-urls=http://0.0.0.0:2379
-      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - "--initial-cluster=etcd1=http://etcd1:2380,\
+           etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
   etcd2:
     container_name: etcd2
     image: quay.io/coreos/etcd:v3.3.12
@@ -33,7 +34,8 @@ services:
       - --listen-peer-urls=http://0.0.0.0:2380
       - --advertise-client-urls=http://etcd2:2379
       - --listen-client-urls=http://0.0.0.0:2379
-      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - "--initial-cluster=etcd1=http://etcd1:2380,\
+          etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
   etcd3:
     container_name: etcd3
     image: quay.io/coreos/etcd:v3.3.12
@@ -50,7 +52,8 @@ services:
       - --listen-peer-urls=http://0.0.0.0:2380
       - --advertise-client-urls=http://etcd3:2379
       - --listen-client-urls=http://0.0.0.0:2379
-      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - "--initial-cluster=etcd1=http://etcd1:2380,\
+          etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
 volumes:
   etcd1-data:
   etcd2-data:

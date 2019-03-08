@@ -27,7 +27,7 @@ language: ja
 booktitle: |-
   etcd book
 subtitle: |-
-  Go言語で学ぶetcd入門
+  Go言語で学ぶetcdプログラミング
 
 # 著者名。「, 」で区切って複数指定できる
 # 読みを入れる例 aut: [{name: "青木峰郎", file-as: "アオキミネロウ"}, {name: "武藤健志", file-as: "ムトウケンシ"}, {name: "高橋征義", file-as: "タカハシマサヨシ"}, {name: "角征典", file-as: "カドマサノリ"}]
@@ -344,4 +344,3 @@ pdfmaker:
   coverimage: null
   #
   # pdfmaker:階層を使うものはここまで
-
