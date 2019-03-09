@@ -26,13 +26,13 @@ func main() {
 	//#@@range_begin(txn)
 	addValue := func(d int) {
 	RETRY:
-		resp, _ := client.Get(context.TODO(), "/chapter2/txn")
+		resp, _ := client.Get(context.TODO(), "/chapter3/txn")
 		rev := resp.Kvs[0].ModRevision
 		value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
 		value += d
 		tresp, err := client.Txn(context.TODO()).
-			If(clientv3.Compare(clientv3.ModRevision("/chapter2/txn"), "=", rev)).
-			Then(clientv3.OpPut("/chapter2/txn", strconv.Itoa(value))).
+			If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev)).
+			Then(clientv3.OpPut("/chapter3/txn", strconv.Itoa(value))).
 			Else().
 			Commit()
 		if err != nil {
@@ -42,11 +42,11 @@ func main() {
 			goto RETRY
 		}
 	}
-	client.Put(context.TODO(), "/chapter2/txn", "10")
+	client.Put(context.TODO(), "/chapter3/txn", "10")
 	go addValue(5)
 	go addValue(-3)
 	time.Sleep(1 * time.Second)
-	resp, _ := client.Get(context.TODO(), "/chapter2/txn")
+	resp, _ := client.Get(context.TODO(), "/chapter3/txn")
 	fmt.Println(string(resp.Kvs[0].Value))
 	//#@@range_end(txn)
 }

@@ -1,121 +1,77 @@
-= etcdの運用
+= etcdによる並列処理プログラミング
 
-== etcdの起動
-
-//cmd{
-$ docker run \
-    -p 2379:2379 \
-    -p 2380:2380 \
-    --volume=etcd-data:/etcd-data \
-    --name etcd quay.io/coreos/etcd:v3.3.12 \
-    /usr/local/bin/etcd \
-      --data-dir=/etcd-data --name node1 \
-      --initial-advertise-peer-urls http://${NODE1}:2380 --listen-peer-urls http://${NODE1}:2380 \
-      --advertise-client-urls http://${NODE1}:2379 --listen-client-urls http://${NODE1}:2379 \
-      --initial-cluster node1=http://${NODE1}:2380
-//}
-
-: -p 2379:2379
-    コンテナ外からetcdのAPIを呼び出せるように2379番ポートをホストにバインドしています。
-: -v etcd-data:/var/lib/etcd
-    etcd-dataというボリュームを作成し、コンテナの@<code>{/var/lib/etcd}にバインドしています。これによりコンテナを終了してもetcdのデータは
-消えません。
-
-etcdに以下の起動オプションを指定します。
-
-: --listen-client-urls
-    etcdがクライアントからのリクエストを受け付けるURLを指定します。
-: --advertise-client-urls
-    クライアント用のURLをクラスタの他のメンバーに伝えるために指定します。
-    現在はクラスタを組んでいませんが、@<code>{--listen-client-urls}を指定した場合は必ずこのオプションも指定する必要があります。
+== Transaction
 
 
-== クラスタの構築
-
-//listnum[compose][docker-compose.yml]{
-#@mapfile(../code/chapter3/docker-compose.yml)
-version: '3'
-services:
-  etcd1:
-    container_name: etcd1
-    image: quay.io/coreos/etcd:v3.3.12
-    ports:
-      - 2379
-      - 2380
-    volumes:
-      - etcd1-data:/etcd-data
-    entrypoint:
-      - /usr/local/bin/etcd
-      - --data-dir=/etcd-data
-      - --name=etcd1
-      - --initial-advertise-peer-urls=http://etcd1:2380
-      - --listen-peer-urls=http://0.0.0.0:2380
-      - --advertise-client-urls=http://etcd1:2379
-      - --listen-client-urls=http://0.0.0.0:2379
-      - "--initial-cluster=etcd1=http://etcd1:2380,\
-           etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
-  etcd2:
-    container_name: etcd2
-    image: quay.io/coreos/etcd:v3.3.12
-    ports:
-      - 2379
-      - 2380
-    volumes:
-      - etcd2-data:/etcd-data
-    entrypoint:
-      - /usr/local/bin/etcd
-      - --data-dir=/etcd-data
-      - --name=etcd2
-      - --initial-advertise-peer-urls=http://etcd2:2380
-      - --listen-peer-urls=http://0.0.0.0:2380
-      - --advertise-client-urls=http://etcd2:2379
-      - --listen-client-urls=http://0.0.0.0:2379
-      - "--initial-cluster=etcd1=http://etcd1:2380,\
-          etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
-  etcd3:
-    container_name: etcd3
-    image: quay.io/coreos/etcd:v3.3.12
-    ports:
-      - 2379
-      - 2380
-    volumes:
-      - etcd3-data:/etcd-data
-    entrypoint:
-      - /usr/local/bin/etcd
-      - --data-dir=/etcd-data
-      - --name=etcd3
-      - --initial-advertise-peer-urls=http://etcd3:2380
-      - --listen-peer-urls=http://0.0.0.0:2380
-      - --advertise-client-urls=http://etcd3:2379
-      - --listen-client-urls=http://0.0.0.0:2379
-      - "--initial-cluster=etcd1=http://etcd1:2380,\
-          etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
-volumes:
-  etcd1-data:
-  etcd2-data:
-  etcd3-data:
+//listnum[tocttou][TOCTTOUの例]{
+#@maprange(../code/chapter3/tocttou/tocttou.go,tocttou)
+    addValue := func(d int) {
+        resp, _ := client.Get(context.TODO(), "/chapter3/tocttou")
+        value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
+        value += d
+        client.Put(context.TODO(), "/chapter3/tocttou", strconv.Itoa(value))
+    }
+    client.Put(context.TODO(), "/chapter3/tocttou", "10")
+    go addValue(5)
+    go addValue(-3)
+    time.Sleep(1 * time.Second)
+    resp, _ := client.Get(context.TODO(), "/chapter3/tocttou")
+    fmt.Println(string(resp.Kvs[0].Value))
 #@end
 //}
 
+このコードでは、最初に値に10をセットし5を足して3を引いたのですから、結果は12になってほしいところです。
+しかし実際に実行してみると、結果は15になったり7になったりばらつきます。
 
-//terminal{
-$ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd1 etcdctl --endpoints=http://etcd1:2379,http://etcd2:2379,http://etcd3:2379'
+このような問題をTOCTTOU(Time of check to time of use)と呼びます。
+
+Transactionを利用したコードに書き換えてみましょう。
+
+//listnum[txn][Transaction]{
+#@maprange(../code/chapter3/transaction/transaction.go,txn)
+    addValue := func(d int) {
+    RETRY:
+        resp, _ := client.Get(context.TODO(), "/chapter3/txn")
+        rev := resp.Kvs[0].ModRevision
+        value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
+        value += d
+        tresp, err := client.Txn(context.TODO()).
+            If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev)).
+            Then(clientv3.OpPut("/chapter3/txn", strconv.Itoa(value))).
+            Else().
+            Commit()
+        if err != nil {
+            return
+        }
+        if !tresp.Succeeded {
+            goto RETRY
+        }
+    }
+    client.Put(context.TODO(), "/chapter3/txn", "10")
+    go addValue(5)
+    go addValue(-3)
+    time.Sleep(1 * time.Second)
+    resp, _ := client.Get(context.TODO(), "/chapter3/txn")
+    fmt.Println(string(resp.Kvs[0].Value))
+#@end
 //}
 
-== 証明書
+このコードを実行すると結果は必ず12になり、期待する結果が得られます。
 
-== ユーザー
+@<code>{If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev))}では、現在の/chapter3/txnのModRevisionと、最初に値を取得したときのModRevisionを比較しています。
+すなわち、値を取得したときと現在で/chapter3/txnの値が書き換えられていないかどうかをチェックしています。
 
-== スナップショット
+このifの条件が成立するとThenで指定した処理が実行され、そうでなければElseの処理が実行されます。
+ここではThenの中で値の書き込みをおこない、Elseのなかでは何もしていません。
 
-== コンパクション
+そして最後にtresp.Succeededをチェックしています。
+この値はIfの条件が成立した場合にtrueになります。
 
-== アップグレード
+== ネストしたトランザクション
 
-== モニタリング
 
-== その他
- * cors
- * discover
- * pprof
- * proxy
+== Concurrency
+
+MVCC
+
+Mutex.IsOwner
