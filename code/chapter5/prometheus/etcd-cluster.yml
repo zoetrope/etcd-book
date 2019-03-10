@@ -1,0 +1,12 @@
+apiVersion: "etcd.database.coreos.com/v1beta2"
+kind: "EtcdCluster"
+metadata:
+  name: "example-etcd-cluster"
+spec:
+  size: 3
+  version: "3.3.12"
+  pod: 
+    annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port: '2379'
+      prometheus.io/metrics: /metrics
