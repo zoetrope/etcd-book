@@ -102,8 +102,13 @@ func main() {
 
 この他にもキーの数だけを返す@<code>{WithCountOnly}や、見つかった最初のキーだけを返す@<code>{WithFirstKey}などたくさんのオプションがあります。
 
+== Watch
+
 == Lease
 
-== Watch
+何に使えるか。
+一時的にログを蓄えておきたい(Kubernetesのkube-apiserverの--event-ttlとか)
+セッション情報とか
+
 
 == Namespace

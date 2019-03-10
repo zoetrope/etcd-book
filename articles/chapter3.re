@@ -67,9 +67,6 @@ Transactionを利用したコードに書き換えてみましょう。
 そして最後にtresp.Succeededをチェックしています。
 この値はIfの条件が成立した場合にtrueになります。
 
-== ネストしたトランザクション
-
-
 == Concurrency
 
 MVCC
