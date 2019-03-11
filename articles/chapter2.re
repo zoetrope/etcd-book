@@ -9,7 +9,7 @@ package main
 import (
     "context"
     "fmt"
-    "os"
+    "log"
     "time"
 
     "github.com/coreos/etcd/clientv3"
@@ -23,15 +23,13 @@ func main() {
 
     client, err := clientv3.New(cfg)
     if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
+        log.Fatal(err)
     }
     defer client.Close()
 
     resp, err := client.Status(context.Background(), "localhost:2379")
     if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
+        log.Fatal(err)
     }
     fmt.Printf("%#v\n", resp)
 }
@@ -45,8 +43,7 @@ func main() {
 #@maprange(../code/chapter2/kv/kv.go,write)
     _, err = client.Put(context.TODO(), "/chapter2/kv", "value")
     if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
+        log.Fatal(err)
     }
 #@end
 //}
@@ -55,12 +52,10 @@ func main() {
 #@maprange(../code/chapter2/kv/kv.go,read)
     resp, err := client.Get(context.TODO(), "/chapter2/kv")
     if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
+        log.Fatal(err)
     }
     if resp.Count == 0 {
-        fmt.Println("not found")
-        os.Exit(1)
+        log.Fatal(err)
     }
     fmt.Println(string(resp.Kvs[0].Value))
 #@end
@@ -79,8 +74,7 @@ func main() {
         clientv3.WithKeysOnly(),
     )
     if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
+        log.Fatal(err)
     }
     for _, kv := range resp.Kvs {
         fmt.Printf("%s: %s\n", kv.Key, kv.Value)
@@ -110,5 +104,63 @@ func main() {
 一時的にログを蓄えておきたい(Kubernetesのkube-apiserverの--event-ttlとか)
 セッション情報とか
 
+//listnum[lease][キーの有効期限を設定]{
+#@maprange(../code/chapter2/lease/lease.go,lease)
+    grantResp, err := client.Grant(context.TODO(), 5)
+    if err != nil {
+        log.Fatal(err)
+    }
+    _, err = client.Put(context.TODO(), "/chapter2/lease", "value", clientv3.WithLease(grantResp.ID))
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for {
+        getResp, err := client.Get(context.TODO(), "/chapter2/lease")
+        if err != nil {
+            log.Fatal(err)
+        }
+        if getResp.Count == 0 {
+            fmt.Println("'/chapter2/lease' disappeared")
+            break
+        }
+        fmt.Printf("[%v] %s\n", time.Now().Format("15:04:05"), getResp.Kvs[0].Value)
+        time.Sleep(1 * time.Second)
+    }
+#@end
+//}
+
+//terminal{
+$ ./lease                   
+[21:40:59] value
+[21:41:00] value
+[21:41:01] value
+[21:41:02] value
+[21:41:03] value
+[21:41:04] value
+'/chapter2/lease' disappeared
+//}
+
+//listnum[][リースの期限を延長する]{
+    kaoResp, err = client.KeepAliveOnce(context.TODO(), grantResp.ID)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(kao.TTL)
+//}
+
+//listnum[][リースの期限を延長し続ける]{
+    _, err = client.KeepAlive(context.TODO(), grantResp.ID)
+    if err != nil {
+        log.Fatal(err)
+    }
+//}
+
+//listnum[][リースを失効させる]{
+    _, err = client.Revoke(context.TODO(), grantResp.ID)
+    if err != nil {
+        log.Fatal(err)
+    }
+//}
 
 == Namespace

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
+	"log"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -17,8 +17,7 @@ func main() {
 
 	client, err := clientv3.New(cfg)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer client.Close()
 	//#@@range_begin(read)
@@ -31,8 +30,7 @@ func main() {
 		clientv3.WithKeysOnly(),
 	)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	for _, kv := range resp.Kvs {
 		fmt.Printf("%s: %s\n", kv.Key, kv.Value)

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
+	"log"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -17,28 +17,24 @@ func main() {
 
 	client, err := clientv3.New(cfg)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer client.Close()
 
 	//#@@range_begin(write)
 	_, err = client.Put(context.TODO(), "/chapter2/kv", "value")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	//#@@range_end(write)
 
 	//#@@range_begin(read)
 	resp, err := client.Get(context.TODO(), "/chapter2/kv")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	if resp.Count == 0 {
-		fmt.Println("not found")
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	fmt.Println(string(resp.Kvs[0].Value))
 	//#@@range_end(read)

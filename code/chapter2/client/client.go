@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
+	"log"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -17,15 +17,13 @@ func main() {
 
 	client, err := clientv3.New(cfg)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer client.Close()
 
 	resp, err := client.Status(context.Background(), "localhost:2379")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	fmt.Printf("%#v\n", resp)
 }

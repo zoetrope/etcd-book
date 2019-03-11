@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
+	"log"
 	"strconv"
 	"time"
 
@@ -18,8 +18,7 @@ func main() {
 
 	client, err := clientv3.New(cfg)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer client.Close()
 
@@ -36,7 +35,7 @@ func main() {
 			Else().
 			Commit()
 		if err != nil {
-			return
+			log.Fatal(err)
 		}
 		if !tresp.Succeeded {
 			goto RETRY
