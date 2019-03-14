@@ -2,6 +2,24 @@
 
 == クライアントを用意する
 
+それではさっそくGo言語によるetcdプログラミングをはじめましょう。
+
+Go言語の開発環境はセットアップ済みですか？
+もしセットアップが完了していないのであれば、@<href>{https://golang.org/doc/install}を開き、
+利用しているOS向けのバイナリをダウンロードしてきてください。
+
+Go言語のバージョンを確認しておきましょうか。
+本書ではGo 1.12を利用します。
+本書のサンプルコードは古いGoでも動くとは思いますが、最新版を利用することをおすすめします。
+
+//terminal{
+$ go version
+go version go1.12 linux/amd64
+//}
+
+それではetcdにアクセスするGo言語のプログラムを書いてみましょう。
+以下のようなファイルを作成し、client.goという名前で保存してください。
+
 //listnum[client][クライアントの作成]{
 #@mapfile(../code/chapter2/client/client.go)
 package main
@@ -27,15 +45,53 @@ func main() {
     }
     defer client.Close()
 
-    resp, err := client.Status(context.Background(), "localhost:2379")
+    resp, err := client.MemberList(context.Background())
     if err != nil {
         log.Fatal(err)
     }
-    fmt.Printf("%#v\n", resp)
+    for _, m := range resp.Members {
+        fmt.Printf("%s\n", m.String())
+    }
 }
 #@end
 //}
 
+次にこのコードをコンパイルします。何もエラーメッセージが表示されなければ成功です。
+
+//terminal{
+$ go build client.go
+//}
+
+etcdは起動したままになっていますか？ 
+もし起動していないようなら@<chap>{chapter1}に戻って起動してきてください。
+
+コンパイルしたプログラムを実行してみましょう。
+以下のようなメッセージが表示されれば成功です。
+このプログラムでは、etcdクラスタを構成するメンバーの情報を表示しています。
+
+//terminal{
+$ ./client
+ID:10276657743932975437 name:"etcd-1" peerURLs:"http://localhost:2380" clientURLs:"http://0.0.0.0:2379"
+//}
+
+もしetcdが起動していなかったり、接続するアドレスが間違っていたりすると、以下のようなエラーが発生します。
+etcdが起動しているかどうか、プログラムが間違っていないかどうかを確認してください。
+
+//terminal{
+$ ./client
+2019/03/14 20:34:02 dial tcp 127.0.0.1:2379: connect: connection refused
+//}
+
+ではソースコードの解説をしていきます。
+
+まず@<code>{github.com/coreos/etcd/clientv3}をインポートしています@<fn>{package}。これは
+
+次に@<code>{clientv3.Config}型の変数を用意しています。
+これはetcdに接続するときに利用する設定で、接続先のアドレスや接続時のタイムアウト時間などを指定できます。
+
+
+
+//footnote[package][etcd v3.3までは@<code>{github.com/coreos/etcd/clientv3}ですが、etcd v3.4から@<code>{github.com/etcd-io/etcd/clientv3}に変わるので注意してください。]
 
 == KV
 
@@ -110,7 +166,8 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    _, err = client.Put(context.TODO(), "/chapter2/lease", "value", clientv3.WithLease(grantResp.ID))
+    _, err = client.Put(context.TODO(), "/chapter2/lease", "value",
+        clientv3.WithLease(grantResp.ID))
     if err != nil {
         log.Fatal(err)
     }
@@ -124,7 +181,8 @@ func main() {
             fmt.Println("'/chapter2/lease' disappeared")
             break
         }
-        fmt.Printf("[%v] %s\n", time.Now().Format("15:04:05"), getResp.Kvs[0].Value)
+        fmt.Printf("[%v] %s\n",
+            time.Now().Format("15:04:05"), getResp.Kvs[0].Value)
         time.Sleep(1 * time.Second)
     }
 #@end

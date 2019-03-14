@@ -19,13 +19,13 @@ etcdは強い一貫性モデルを採用しています。
 
 このような高可用性と強い一貫性を実現するために、etcdはRaftという分散合意(Consensus)アルゴリズムに基づいて実装がおこなわれています。
 
-また、Watch(値の変更監視)、Lease(キーの有効期限)、Leader Electionなど機能をライブラリ的に利用する仕組みを提供しています。
-
-一方で、大きなデータは取り扱うことができず(クラスタ全体で扱えるデータサイズはデフォルトで2GB、最大8GB)、
-メンバーの数を増やしても性能を向上させることはできないため、大容量のデータを高速に扱うような用途には向いていません。
+また、Watch(値の変更監視)、Lease(キーの有効期限)、Leader Electionなどの機能をライブラリとして利用する仕組みを提供しています。
 
 以上のような特徴を持つことから、分散システムのバックエンドとして使いやすいと評価され、
 Kubernetesを始め、CoreDNS、Vault、Calicoなど様々なシステムで採用されています。
+
+一方で、大きなデータは取り扱うことができず(クラスタ全体で扱えるデータサイズはデフォルトで2GB、最大8GB)、
+メンバーの数を増やしても性能を向上させることはできないため、大容量のデータを高速に扱うような用途には向いていません。
 
 == etcdを起動してみよう
 
@@ -44,6 +44,7 @@ $ docker run --name etcd \
     --volume=etcd-data:/etcd-data \
     --name etcd quay.io/coreos/etcd:v3.3.12 \
     /usr/local/bin/etcd \
+      --name=etcd-1 \
       --data-dir=/etcd-data \
       --advertise-client-urls http://0.0.0.0:2379 \
       --listen-client-urls http://0.0.0.0:2379
@@ -56,10 +57,10 @@ $ docker run --name etcd \
 //terminal{
 2019-03-03 03:53:34.908093 I | etcdmain: etcd Version: 3.3.12
 2019-03-03 03:53:34.908213 I | etcdmain: Git SHA: GitNotFound
-2019-03-03 03:53:34.908217 I | etcdmain: Go Version: go1.11.4
+2019-03-03 03:53:34.908217 I | etcdmain: Go Version: go1.10.8
 2019-03-03 03:53:34.908223 I | etcdmain: Go OS/Arch: linux/amd64
   ・・中略・・
-2019-03-03 03:53:36.625034 I | etcdserver: published {Name:default ClientURLs:[http://0.0.0.0:2379]} to cluster cdf818194e3a8c32
+2019-03-03 03:53:36.625034 I | etcdserver: published {Name:etcd-1 ClientURLs:[http://0.0.0.0:2379]} to cluster cdf818194e3a8c32
 2019-03-03 03:53:36.625087 I | embed: ready to serve client requests
 2019-03-03 03:53:36.625491 N | embed: serving insecure client requests on [::]:2379, this is strongly discouraged!
 //}
@@ -109,6 +110,8 @@ namepaceや、アクセス権の
  * /registry/services/kube-system/default
 
 === RevisionとVersion
+
+MVCC (Multiversion concurrency control)
 
 etcdにおける重要な要素の一つとしてRevisionがあります。
 

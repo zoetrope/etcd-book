@@ -69,6 +69,4 @@ Transactionを利用したコードに書き換えてみましょう。
 
 == Concurrency
 
-MVCC
-
 Mutex.IsOwner

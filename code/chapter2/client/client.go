@@ -21,9 +21,11 @@ func main() {
 	}
 	defer client.Close()
 
-	resp, err := client.Status(context.Background(), "localhost:2379")
+	resp, err := client.MemberList(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%#v\n", resp)
+	for _, m := range resp.Members {
+		fmt.Printf("%s\n", m.String())
+	}
 }
