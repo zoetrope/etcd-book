@@ -45,7 +45,7 @@ func main() {
     }
     defer client.Close()
 
-    resp, err := client.MemberList(context.Background())
+    resp, err := client.MemberList(context.TODO())
     if err != nil {
         log.Fatal(err)
     }
@@ -86,12 +86,15 @@ $ ./client
 
 まず@<code>{github.com/coreos/etcd/clientv3}をインポートしています@<fn>{package}。これは
 
+//footnote[package][etcd v3.3までは@<code>{github.com/coreos/etcd/clientv3}ですが、etcd v3.4から@<code>{github.com/etcd-io/etcd/clientv3}に変わるので注意してください。]
+
 次に@<code>{clientv3.Config}型の変数を用意しています。
 これはetcdに接続するときに利用する設定で、接続先のアドレスや接続時のタイムアウト時間などを指定できます。
 
+この設定を利用して、@<code>{clientv3.New()}でクライアントを作成します。
+このとき、etcdとの接続に失敗するとエラーが返ってきます。
 
-
-//footnote[package][etcd v3.3までは@<code>{github.com/coreos/etcd/clientv3}ですが、etcd v3.4から@<code>{github.com/etcd-io/etcd/clientv3}に変わるので注意してください。]
+最後に作成したクライアントを利用して、@<code>{MemberList()}
 
 == KV
 
@@ -152,7 +155,91 @@ $ ./client
 
 この他にもキーの数だけを返す@<code>{WithCountOnly}や、見つかった最初のキーだけを返す@<code>{WithFirstKey}などたくさんのオプションがあります。
 
+== context
+
+etcdのクライアントが提供している多くのメソッドは、第一引数に@<code>{context.Context}を受けるようになっています。
+
+@<code>{context.Context}は、ブロッキング処理や時間のかかる処理など、
+タイムアウトさせたり、キャンセルさせるために利用される機構です@<fn>{context}。
+
+//footnote[context][context.Contextはキャンセルの伝搬だけでなく値の共有にも利用できますが、ここでは説明は割愛します。]
+
+etcdクライアントは、etcdサーバーとの通信をおこなうため、
+リクエストを投げてからどれくらいの時間で返ってくるかはわかりません。その間の処理はブロックされることになります。
+
+それではcontextを利用して処理をキャンセルする例をみてみましょう。
+
+//listnum[context][処理のキャンセル]{
+#@maprange(../code/capter2/context/context.go,context)
+    ch := make(chan os.Signal, 1)
+    signal.Notify(ch, os.Interrupt)
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+    go func() {
+        <-ch
+        cancel()
+    }()
+
+    for {
+        _, err := client.Get(ctx, "/chapter2/context")
+        if err != nil {
+            fmt.Println(err)
+            break
+        }
+        time.Sleep(1 * time.Second)
+    }
+#@end
+//}
+
+この例では、Ctrl+Cなどを利用してSIGINTシグナルを受け取ったときに処理をキャンセルするようなcontextを作っています。
+このcontextを@<code>{client.Get()}の第一引数に渡しています。
+
+"Context canceled"というメッセージが表示されてプログラムが終了する
+
+
+本書では@<code>{context.TODO()}を利用していますが、実際にコードを書くときには適切なコンテキストを利用してください@<fn>{todo}。
+
+//footnote[todo][TODOという文字列が残っているとエディタや静的解析ツールが注意してくれるので、それに気づくことができるでしょう。]
+
 == Watch
+
+//listnum[watch][変更の監視]{
+#@maprange(../code/chapter2/watch/watch.go,watch)
+    rch := client.Watch(context.TODO(), "/chapter2/watch", clientv3.WithPrefix())
+    for wresp := range rch {
+        wresp.Err()
+        wresp.IsProgressNotify()
+        for _, ev := range wresp.Events {
+            if ev.Type == mvccpb.PUT {
+
+            }
+            if ev.Type == mvccpb.DELETE {
+
+            }
+            fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+        }
+    }
+#@end
+//}
+
+Errを返すケース
+* クライアントをCloseするなど監視を終了した場合
+* Compactionされた場合
+
+WithPrefix
+WithRev
+WithPrevKV
+WithProgressNotify
+WithCreatedNotify
+WithFilterPut
+WithFilterDelete
+
+まずGetで値を取ってきて処理。その後にwatchを開始。
+GetとWatchの間にもし値が変更されていたら、値を取りこぼすことになってしまいます。
+データを取りこぼさないようにWithRevを利用する。
+最後に読み取ったrevの値をファイルなどに書き出しておいてもよいでしょう。
+
+revを指定してWatchを開始しした場合、その値はすでにコンパクションされている可能性もあります。
 
 == Lease
 
@@ -207,12 +294,19 @@ $ ./lease
     fmt.Println(kao.TTL)
 //}
 
+リースの期間を延長し続けるなんて、リースの意味がなくなってしまうのではと思うかもしれません。
+しかし、KeepAliveを呼び出したプログラムが終了すると、リースの期限は延長されなくなり、いずれそのキーは消えてしまいます。
+この機能を利用することでプログラムの生存をチェックすることが可能になります。
+これをうまく利用したのがリーダー選出の機能です。後ほど紹介します。
+
 //listnum[][リースの期限を延長し続ける]{
     _, err = client.KeepAlive(context.TODO(), grantResp.ID)
     if err != nil {
         log.Fatal(err)
     }
 //}
+
+指定した期限までまだ時間がある場合でも、そのキーを失効させたい場合があります。
 
 //listnum[][リースを失効させる]{
     _, err = client.Revoke(context.TODO(), grantResp.ID)

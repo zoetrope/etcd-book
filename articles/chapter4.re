@@ -104,11 +104,17 @@ $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd1 etcdctl --endpoints=http:/
 
 == 証明書
 
+1つめに指定したメンバーにアクセスできない場合、他のメンバーに接続してくれない問題がある。
+
 == ユーザー
 
 == スナップショット
 
 == コンパクション
+
+== メンバーの追加・削除
+
+メンバーが追加できるようになるまで少し時間がかかるので注意。
 
 == アップグレード
 
@@ -119,3 +125,4 @@ $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd1 etcdctl --endpoints=http:/
  * discover
  * pprof
  * proxy
+ * defrag
