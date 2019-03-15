@@ -67,6 +67,18 @@ Transactionを利用したコードに書き換えてみましょう。
 そして最後にtresp.Succeededをチェックしています。
 この値はIfの条件が成立した場合にtrueになります。
 
+ * 複数の処理を同時実行するだけ
+ * ネストしたトランザクション
+ * Else
+
 == Concurrency
 
 Mutex.IsOwner
+
+== Declarative
+
+kubectlは、kube-apiserverを経由してetcdにリソースを書き込みます。
+kube-controller-managerは、kube-apiserverを経由してリソースの変更をWatchしている。
+変更が合った時にetcdから取得したリソースと、実際に
+
+kubeconのwatch apiの資料読む
