@@ -170,33 +170,41 @@ etcdクライアントは、etcdサーバーとの通信をおこなうため、
 それではcontextを利用して処理をキャンセルする例をみてみましょう。
 
 //listnum[context][処理のキャンセル]{
-#@maprange(../code/capter2/context/context.go,context)
-    ch := make(chan os.Signal, 1)
-    signal.Notify(ch, os.Interrupt)
-    ctx, cancel := context.WithCancel(context.Background())
+#@maprange(../code/chapter2/timeout/timeout.go,timeout)
+    ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
     defer cancel()
-    go func() {
-        <-ch
-        cancel()
-    }()
-
-    for {
-        _, err := client.Get(ctx, "/chapter2/context")
-        if err != nil {
-            fmt.Println(err)
-            break
-        }
-        time.Sleep(1 * time.Second)
+    resp, err := client.Get(ctx, "/chapter2/timeout")
+    if err != nil {
+        log.Fatal(err)
     }
+    fmt.Println(resp)
 #@end
 //}
 
-この例では、SIGINTシグナルを受け取ったときに処理をキャンセルするようなcontextを作っています。
-このcontextを@<code>{client.Get()}の第一引数に渡しています。
-これにより、@<code>{client.Get()}に時間がかかっていたとしても、contextがキャンセルされると、途中で処理を終了します。
-このとき@<code>{client.Get()}はnilではないエラー値を返します。
+この例では1秒でタイムアウトするcontextを作り、@<code>{client.Get()}の第一引数に渡しています。
+これにより、@<code>{client.Get()}に時間がかかっていた場合、1秒経過すると途中で処理を終了します。
+処理が途中で終了した場合、@<code>{client.Get()}はエラーを返します。
 
-このプログラムを実行し、Ctrl+Cを押してみましょう。"Context canceled"というメッセージが表示されてプログラムが終了するはずです。
+このプログラムを実行してみましょう。
+通常はGetの処理に1秒もかからないため、問題なく値が取得できていると思います。
+
+それではネットワーク遅延を擬似的に発生させてみましょう。
+詳しくは@<chap>{chapter6}で説明しますが、以下のようにtcコマンドを利用することで、etcdコンテナとの通信に3秒の遅延が発生します。
+
+//terminal{
+$ VETH=$(sudo ./chapter6/veth.sh etcd)
+$ sudo tc qdisc add dev $VETH root netem delay 3s
+//}
+
+もう一度プログラムを実行してみましょう。
+少し待つと"context deadline exceedef"というメッセージが表示されてプログラムが終了するはずです。
+
+//terminal{
+$ VETH=$(sudo ./chapter6/veth.sh etcd)
+$ sudo tc qdisc del dev $VETH root
+//}
+
+
 
 
 本書では@<code>{context.TODO()}を利用していますが、実際にコードを書くときには適切なコンテキストを利用してください@<fn>{todo}。
@@ -207,18 +215,23 @@ etcdクライアントは、etcdサーバーとの通信をおこなうため、
 
 //listnum[watch][変更の監視]{
 #@maprange(../code/chapter2/watch/watch.go,watch)
-    rch := client.Watch(context.TODO(), "/chapter2/watch", clientv3.WithPrefix())
-    for wresp := range rch {
-        wresp.Err()
-        wresp.IsProgressNotify()
-        for _, ev := range wresp.Events {
-            if ev.Type == mvccpb.PUT {
-
+    ch := client.Watch(context.TODO(), "/chapter2/watch/", clientv3.WithPrefix())
+    for resp := range ch {
+        if resp.Err() != nil {
+            log.Fatal(resp.Err())
+        }
+        for _, ev := range resp.Events {
+            switch ev.Type {
+            case clientv3.EventTypePut:
+                switch {
+                case ev.IsCreate():
+                    fmt.Printf("CREATE %q : %q\n", ev.Kv.Key, ev.Kv.Value)
+                case ev.IsModify():
+                    fmt.Printf("MODIFY %q : %q\n", ev.Kv.Key, ev.Kv.Value)
+                }
+            case clientv3.EventTypeDelete:
+                fmt.Printf("DELETE %q : %q\n", ev.Kv.Key, ev.Kv.Value)
             }
-            if ev.Type == mvccpb.DELETE {
-
-            }
-            fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
         }
     }
 #@end

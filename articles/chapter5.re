@@ -110,3 +110,5 @@ $ kubectl apply -f etcd-cluster.yml
 https://grafana.com/dashboards/3070
 
 == etcdadm
+
+== gofail
