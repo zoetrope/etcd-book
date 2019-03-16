@@ -87,7 +87,7 @@ https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubern
 
 
 //listnum[etcd-cluster][etcd-cluster.yml]{
-#@mapfile(../code/chapter5/prometheus/example-etcd-cluster.yml)
+#@mapfile(../code/chapter5/prometheus/etcd-cluster.yml)
 apiVersion: "etcd.database.coreos.com/v1beta2"
 kind: "EtcdCluster"
 metadata:

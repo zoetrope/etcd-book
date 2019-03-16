@@ -41,7 +41,7 @@ Transactionを利用したコードに書き換えてみましょう。
             Else().
             Commit()
         if err != nil {
-            return
+            log.Fatal(err)
         }
         if !tresp.Succeeded {
             goto RETRY
@@ -73,7 +73,44 @@ Transactionを利用したコードに書き換えてみましょう。
 
 == Concurrency
 
-=== STM
+利用するためには@<code>{"github.com/coreos/etcd/clientv3/concurrency"}パッケージをインポートする必要があります。
+
+
+=== STM(Software Transactional Memory)
+
+先程のトランザクション処理をSTMを使って書き換えてみましょう。
+
+//listnum[stm][STM]{
+#@maprange(../code/chapter3/stm/stm.go,stm)
+    addValue := func(d int) {
+        _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
+            v := stm.Get("/chapter3/stm")
+            value, err := strconv.Atoi(v)
+            if err != nil {
+                return err
+            }
+            value += d
+            stm.Put("/chapter3/stm", strconv.Itoa(value))
+            return nil
+        })
+        if err != nil {
+            log.Fatal(err)
+        }
+    }
+
+    client.Put(context.TODO(), "/chapter3/stm", "10")
+    go addValue(5)
+    go addValue(-3)
+
+    time.Sleep(1 * time.Second)
+    resp, _ := client.Get(context.TODO(), "/chapter3/stm")
+    fmt.Println(string(resp.Kvs[0].Value))
+#@end
+//}
+
+WithIsolation
+WithPrefetch
+WithAbortContext
 
 === Leader Election
 

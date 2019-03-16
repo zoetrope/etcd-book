@@ -23,9 +23,9 @@ func main() {
 	}
 	defer client.Close()
 
-	//#@@range_begin(txn)
-	addValue := func(d int) func(stm concurrency.STM) error {
-		return func(stm concurrency.STM) error {
+	//#@@range_begin(stm)
+	addValue := func(d int) {
+		_, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
 			v := stm.Get("/chapter3/stm")
 			value, err := strconv.Atoi(v)
 			if err != nil {
@@ -34,22 +34,18 @@ func main() {
 			value += d
 			stm.Put("/chapter3/stm", strconv.Itoa(value))
 			return nil
+		})
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
+
 	client.Put(context.TODO(), "/chapter3/stm", "10")
-	go func(){
-		if _, err := concurrency.NewSTM(client, addValue(5)); err != nil {
-			log.Fatal(err)
-		}
-	}()
-	go func(){
-		if _, err := concurrency.NewSTM(client, addValue(-3)); err != nil {
-			log.Fatal(err)
-		}
-	}()
-	
+	go addValue(5)
+	go addValue(-3)
+
 	time.Sleep(1 * time.Second)
 	resp, _ := client.Get(context.TODO(), "/chapter3/stm")
 	fmt.Println(string(resp.Kvs[0].Value))
-	//#@@range_end(txn)
+	//#@@range_end(stm)
 }
