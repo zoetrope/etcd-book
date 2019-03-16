@@ -122,7 +122,11 @@ $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd1 etcdctl --endpoints=http:/
 
 == その他
  * cors
- * discover
+ * discover / naming
  * pprof
  * proxy
  * defrag
+ * mirror
+ * balancer (etcd v3.4)
+ * leasing
+ * ordering

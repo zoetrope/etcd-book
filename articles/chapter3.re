@@ -73,6 +73,12 @@ Transactionを利用したコードに書き換えてみましょう。
 
 == Concurrency
 
+=== STM
+
+=== Leader Election
+
+=== Mutex
+
 Mutex.IsOwner
 
 == Declarative
