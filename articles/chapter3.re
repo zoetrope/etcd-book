@@ -75,6 +75,60 @@ Transactionを利用したコードに書き換えてみましょう。
 
 利用するためには@<code>{"github.com/coreos/etcd/clientv3/concurrency"}パッケージをインポートする必要があります。
 
+=== Mutex
+
+//listnum[mutex][ロック]{
+#@maprange(../code/chapter3/mutex/mutex.go,lock)
+    s, err := concurrency.NewSession(client)
+    if err != nil {
+        log.Fatal(err)
+    }
+    m := concurrency.NewMutex(s, "/chapter3/mutex")
+    err = m.Lock(context.TODO())
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println("acquired lock")
+    time.Sleep(5 * time.Second)
+    m.IsOwner()
+    err = m.Unlock(context.TODO())
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println("released lock")
+#@end
+//}
+
+ロックを取ったままプログラムが終了してしまったら？
+リースが設定してあるので大丈夫。
+
+さて、ロックが取れたからといって安心してはいけません。
+ロックした後に一度ネットワーク接続が切れて、ロックのキーのリース期間が終了しているかもしれません。
+そうなってしまうと、プログラムは自分がロックしたつもりで動作しているのに、実際にはロックされていないという状況に陥ってしまいます。
+
+そこで、ロックを取ったあとにetcdのキーバリューの操作をおこなう際には、トランザクションを利用してIf条件に@<code>{Mutex.IsOwner()}を指定しましょう。
+
+//listnum[owner][IsOwner]{
+#@maprange(../code/chapter3/mutex/mutex.go,owner)
+RETRY:
+    err = m.Lock(context.TODO())
+    if err != nil {
+        log.Fatal(err)
+    }
+    resp, err := client.Txn(context.TODO()).
+        If(m.IsOwner()).
+        Then(clientv3.OpPut("/chapter3/mutex/owner", "test")).
+        Commit()
+    if err != nil {
+        log.Fatal(err)
+    }
+    m.Unlock(context.TODO())
+    if resp.Succeeded {
+        goto RETRY
+    }
+#@end
+//}
+
 
 === STM(Software Transactional Memory)
 
@@ -161,9 +215,45 @@ WithAbortContext
 
 === Leader Election
 
-=== Mutex
+//listnum[leader][リーダー選出]{
+#@maprange(../code/chapter3/leader/leader.go,leader)
+    flag.Parse()
+    if flag.NArg() != 1 {
+        log.Fatal("usage: ./leader NAME")
+    }
+    name := flag.Arg(0)
+    s, err := concurrency.NewSession(client, concurrency.WithLease(leaseID))
+    if err != nil {
+        log.Fatal(err)
+    }
+    e := concurrency.NewElection(s, "/chapter3/leader/")
 
-Mutex.IsOwner
+    err = e.Campaign(context.TODO(), name)
+    if err != nil {
+        log.Fatal(err)
+    }
+    for i := 0; i < 5; i++ {
+        fmt.Println(name + " is a leader.")
+        time.Sleep(1 * time.Second)
+    }
+    err = e.Resign(context.TODO())
+    if err != nil {
+        log.Fatal(err)
+    }
+#@end
+//}
+
+ではここで、リーダーが明示的にResignせずに終了してしまったらどうなるでしょうか？
+Ctrl+Cを押してリーダーのプロセスを終了させてみてください。
+他のプロセスがリーダーになることはなく、
+その状態で60秒ほど待つとようやく他のプロセスがリーダーになります。
+
+これはLease機能を利用して、リーダーキーのリース期間が延長されない場合は自動的にキーが削除されるようになっています。
+
+リーダーになったからといって安心してはいけません。
+ネットワーク障害が発生したりして、リーダーキーのリース期間が終了しているかもしれません。
+自分がリーダーだと思って行動していたのに実はリーダーではなかったという状況に陥ります。
+そこで、トランザクションのIf条件にリーダーキーが消えていないことを確認する条件をつけましょう。
 
 == Declarative
 

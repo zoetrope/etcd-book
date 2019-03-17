@@ -264,27 +264,27 @@ revを指定してWatchを開始しした場合、その値はすでにコンパ
 
 //listnum[lease][キーの有効期限を設定]{
 #@maprange(../code/chapter2/lease/lease.go,lease)
-    grantResp, err := client.Grant(context.TODO(), 5)
+    lease, err := client.Grant(context.TODO(), 5)
     if err != nil {
         log.Fatal(err)
     }
     _, err = client.Put(context.TODO(), "/chapter2/lease", "value",
-        clientv3.WithLease(grantResp.ID))
+        clientv3.WithLease(lease.ID))
     if err != nil {
         log.Fatal(err)
     }
 
     for {
-        getResp, err := client.Get(context.TODO(), "/chapter2/lease")
+        resp, err := client.Get(context.TODO(), "/chapter2/lease")
         if err != nil {
             log.Fatal(err)
         }
-        if getResp.Count == 0 {
+        if resp.Count == 0 {
             fmt.Println("'/chapter2/lease' disappeared")
             break
         }
         fmt.Printf("[%v] %s\n",
-            time.Now().Format("15:04:05"), getResp.Kvs[0].Value)
+            time.Now().Format("15:04:05"), resp.Kvs[0].Value)
         time.Sleep(1 * time.Second)
     }
 #@end
