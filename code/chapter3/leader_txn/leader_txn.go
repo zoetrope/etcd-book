@@ -26,15 +26,15 @@ func main() {
 	//#@@range_begin(txn)
 	flag.Parse()
 	if flag.NArg() != 1 {
-		log.Fatal("usage: ./leader NAME")
+		log.Fatal("usage: ./leader_txn NAME")
 	}
 	name := flag.Arg(0)
-	s, err := concurrency.NewSession(client)
+	s, err := concurrency.NewSession(client, concurrency.WithTTL(10))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer s.Close()
-	e := concurrency.NewElection(s, "/chapter3/leader/")
+	e := concurrency.NewElection(s, "/chapter3/leader_txn/")
 
 RETRY:
 	select {
@@ -49,7 +49,7 @@ RETRY:
 	leaderKey := e.Key()
 	resp, err := s.Client().Txn(context.TODO()).
 		If(clientv3util.KeyExists(leaderKey)).
-		Then(clientv3.OpPut("/chapter3/leader/txn", "value")).
+		Then(clientv3.OpPut("/chapter3/leader_txn_value", "value")).
 		Commit()
 	if err != nil {
 		log.Fatal(err)

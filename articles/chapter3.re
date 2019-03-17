@@ -75,6 +75,9 @@ Transactionを利用したコードに書き換えてみましょう。
 
 利用するためには@<code>{"github.com/coreos/etcd/clientv3/concurrency"}パッケージをインポートする必要があります。
 
+Sessionは、Lease機能をいいかんじに使えるようにしたClientのラッパーみたいなもの？
+MutexやLeaderElectionで利用する。
+
 === Mutex
 
 //listnum[mutex][ロック]{
