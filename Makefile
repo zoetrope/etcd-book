@@ -13,11 +13,12 @@ start-etcd:
 		--volume=etcd-data:/etcd-data \
 		--name etcd quay.io/coreos/etcd:v3.3.12 \
 		/usr/local/bin/etcd \
-			--name=etcd-1 \
+			--name=etcd \
 			--data-dir=/etcd-data \
 			--advertise-client-urls http://0.0.0.0:2379 \
 			--listen-client-urls http://0.0.0.0:2379
 
 destroy:
+	docker stop etcd
 	docker rm etcd
 	docker volume rm etcd-data

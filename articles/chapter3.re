@@ -1,4 +1,4 @@
-= etcdによる並列処理プログラミング
+= etcdによる分散処理プログラミング
 
 == Transaction
 
@@ -103,6 +103,7 @@ Transactionを利用したコードに書き換えてみましょう。
 リースが設定してあるので大丈夫。
 
 さて、ロックが取れたからといって安心してはいけません。
+OSが提供するMutexとは異なり
 ロックした後に一度ネットワーク接続が切れて、ロックのキーのリース期間が終了しているかもしれません。
 そうなってしまうと、プログラムは自分がロックしたつもりで動作しているのに、実際にはロックされていないという状況に陥ってしまいます。
 
@@ -124,6 +125,7 @@ RETRY:
     }
     m.Unlock(context.TODO())
     if resp.Succeeded {
+        fmt.Println("the lock was not acquired")
         goto RETRY
     }
 #@end
@@ -169,15 +171,15 @@ WithAbortContext
 副作用禁止
 
  * SerializableSnapshot
-     * 分離レベルをSerializable
-     * さらに、最初に値を読み込んだとき
+ ** 分離レベルをSerializable
+ ** さらに、最初に値を読み込んだとき
  * Serializable
-     * 初回のGet時のrevを覚えておく。2回目以降のGetは他のキーの場合でも同じrevを使って読み込む。
+ ** 初回のGet時のrevを覚えておく。2回目以降のGetは他のキーの場合でも同じrevを使って読み込む。
  * RepeatableReads
  * ReadCommitted
-     * 一般的なトランザクション分離レベルのRead Committedにはなっていない。
-     * 一切トランザクションになっていないので使うべきではない。
-     * ファジーリードも発生しない。一度readした値はキャッシュしているので必ず同じ値を返す。
+ ** 一般的なトランザクション分離レベルのRead Committedにはなっていない。
+ ** 一切トランザクションになっていないので使うべきではない。
+ ** ファジーリードも発生しない。一度readした値はキャッシュしているので必ず同じ値を返す。
 
 //listnum[phantom][ファントムリード]{
 #@maprange(../code/chapter3/isolation/isolation.go,phantom)
@@ -222,7 +224,7 @@ WithAbortContext
         log.Fatal("usage: ./leader NAME")
     }
     name := flag.Arg(0)
-    s, err := concurrency.NewSession(client, concurrency.WithLease(leaseID))
+    s, err := concurrency.NewSession(client)
     if err != nil {
         log.Fatal(err)
     }
@@ -255,10 +257,29 @@ Ctrl+Cを押してリーダーのプロセスを終了させてみてくださ�
 自分がリーダーだと思って行動していたのに実はリーダーではなかったという状況に陥ります。
 そこで、トランザクションのIf条件にリーダーキーが消えていないことを確認する条件をつけましょう。
 
-== Declarative
+//listnum[leader_txn][リーダー選出後のトランザクション]{
+#@maprange(../code/chapter3/leader/leader.go,txn)
+    s, err = concurrency.NewSession(client)
+    if err != nil {
+        log.Fatal(err)
+    }
+    e = concurrency.NewElection(s, "/chapter3/leader/")
 
-kubectlは、kube-apiserverを経由してetcdにリソースを書き込みます。
-kube-controller-managerは、kube-apiserverを経由してリソースの変更をWatchしている。
-変更が合った時にetcdから取得したリソースと、実際に
-
-kubeconのwatch apiの資料読む
+RETRY:
+    err = e.Campaign(context.TODO(), name)
+    if err != nil {
+        log.Fatal(err)
+    }
+    leaderKey := e.Key()
+    resp, err := client.Txn(context.TODO()).
+        If(clientv3util.KeyExists(leaderKey)).
+        Then(clientv3.OpPut("/chapter3/leader/txn", "value")).
+        Commit()
+    if err != nil {
+        log.Fatal(err)
+    }
+    if !resp.Succeeded {
+        goto RETRY
+    }
+#@end
+//}

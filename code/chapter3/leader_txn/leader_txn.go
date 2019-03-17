@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/clientv3/clientv3util"
 	"github.com/coreos/etcd/clientv3/concurrency"
 )
 
@@ -23,7 +23,7 @@ func main() {
 	}
 	defer client.Close()
 
-	//#@@range_begin(leader)
+	//#@@range_begin(txn)
 	flag.Parse()
 	if flag.NArg() != 1 {
 		log.Fatal("usage: ./leader NAME")
@@ -36,17 +36,31 @@ func main() {
 	defer s.Close()
 	e := concurrency.NewElection(s, "/chapter3/leader/")
 
+RETRY:
+	select {
+	case <-s.Done():
+		log.Fatal("session has been orphaned")
+	default:
+	}
 	err = e.Campaign(context.TODO(), name)
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i < 5; i++ {
-		fmt.Println(name + " is a leader.")
-		time.Sleep(1 * time.Second)
+	leaderKey := e.Key()
+	resp, err := s.Client().Txn(context.TODO()).
+		If(clientv3util.KeyExists(leaderKey)).
+		Then(clientv3.OpPut("/chapter3/leader/txn", "value")).
+		Commit()
+	if err != nil {
+		log.Fatal(err)
 	}
+	if !resp.Succeeded {
+		goto RETRY
+	}
+
 	err = e.Resign(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
-	//#@@range_end(leader)
+	//#@@range_end(txn)
 }
