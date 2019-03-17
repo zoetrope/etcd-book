@@ -112,6 +112,53 @@ WithIsolation
 WithPrefetch
 WithAbortContext
 
+副作用禁止
+
+ * SerializableSnapshot
+     * 分離レベルをSerializable
+     * さらに、最初に値を読み込んだとき
+ * Serializable
+     * 初回のGet時のrevを覚えておく。2回目以降のGetは他のキーの場合でも同じrevを使って読み込む。
+ * RepeatableReads
+ * ReadCommitted
+     * 一般的なトランザクション分離レベルのRead Committedにはなっていない。
+     * 一切トランザクションになっていないので使うべきではない。
+     * ファジーリードも発生しない。一度readした値はキャッシュしているので必ず同じ値を返す。
+
+//listnum[phantom][ファントムリード]{
+#@maprange(../code/chapter3/isolation/isolation.go,phantom)
+    addValue := func(d int) {
+        _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
+            v1 := stm.Get("/chapter3/iso/phantom/key1")
+            value := 0
+            if len(v1) != 0 {
+                value, _ = strconv.Atoi(v1)
+            }
+            value += d
+            time.Sleep(time.Duration(rand.Intn(3)) * time.Second)
+            v2 := stm.Get("/chapter3/iso/phantom/key2")
+            if v1 != v2 {
+                fmt.Printf("phantom:%d, %s, %s\n", d, v1, v2)
+            }
+            stm.Put("/chapter3/iso/phantom/key1", strconv.Itoa(value))
+            stm.Put("/chapter3/iso/phantom/key2", strconv.Itoa(value))
+            return nil
+        }, concurrency.WithIsolation(concurrency.RepeatableReads))
+        if err != nil {
+            log.Fatal(err)
+        }
+    }
+
+    client.Delete(context.TODO(), "/chapter3/iso/phantom/", clientv3.WithPrefix())
+    go addValue(5)
+    go addValue(-3)
+
+    time.Sleep(5 * time.Second)
+    resp, _ := client.Get(context.TODO(), "/chapter3/iso/phantom/key1")
+    fmt.Println(string(resp.Kvs[0].Value))
+#@end
+//}
+
 === Leader Election
 
 === Mutex
