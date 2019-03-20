@@ -1,29 +1,38 @@
 = etcdによる分散処理プログラミング
 
+前章ではGo言語を利用してetcdの基本的なデータの読み書きなどの操作をおこないました。
+本章ではトランザクション処理や、分散システムを開発する上で必要となる分散ロックやリーダー選出のプログラミング方法を紹介していきます。
+
 == Transaction
 
+etcdにアクセスするクライアントが常に1つしか存在しないのであれば何も問題はありません。
+しかし、実際には複数のクライアントが同時にetcdにデータを書き込んだり読み込んだりします。
+このようなとき、正しくデータの読み書きをおこなわないと、データの不整合が発生する可能性があります。
+例えば、以下のような例をみてみましょう。
 
-//listnum[tocttou][TOCTTOUの例]{
-#@maprange(../code/chapter3/tocttou/tocttou.go,tocttou)
+//listnum[conflict][コンフリクトの例]{
+#@maprange(../code/chapter3/conflict/conflict.go,conflict)
     addValue := func(d int) {
-        resp, _ := client.Get(context.TODO(), "/chapter3/tocttou")
+        resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
         value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
         value += d
-        client.Put(context.TODO(), "/chapter3/tocttou", strconv.Itoa(value))
+        client.Put(context.TODO(), "/chapter3/conflict", strconv.Itoa(value))
     }
-    client.Put(context.TODO(), "/chapter3/tocttou", "10")
+    client.Put(context.TODO(), "/chapter3/conflict", "10")
     go addValue(5)
     go addValue(-3)
     time.Sleep(1 * time.Second)
-    resp, _ := client.Get(context.TODO(), "/chapter3/tocttou")
+    resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
     fmt.Println(string(resp.Kvs[0].Value))
 #@end
 //}
 
-このコードでは、最初に値に10をセットし5を足して3を引いたのですから、結果は12になってほしいところです。
+このコードではまず@<code>{addValue}という関数を用意しています。
+これは現在の値を読み取り、そこに引数で指定した値を追加して保存するという単純な処理です。
+最初に@<code>{/chapter/conflict}というキーに10をセットしています。
+その後に、値に5を追加する処理と、値から3を引く処理をそれぞれgoroutineとして並列に実行しています。
+結果は12になってほしいところです。
 しかし実際に実行してみると、結果は15になったり7になったりばらつきます。
-
-このような問題をTOCTTOU(Time of check to time of use)と呼びます。
 
 Transactionを利用したコードに書き換えてみましょう。
 
@@ -67,9 +76,23 @@ Transactionを利用したコードに書き換えてみましょう。
 そして最後にtresp.Succeededをチェックしています。
 この値はIfの条件が成立した場合にtrueになります。
 
+ * いろいろなif条件
+ ** ターゲット
+ *** Value
+ *** Version
+ *** CreateRevision
+ *** ModRevision
+ *** LeaseValue
+ ** 演算子
+ *** "="
+ *** "!="
+ *** "<"
+ *** ">"
+ ** KeyMissing
+ ** KeyExists
+ * Else
  * 複数の処理を同時実行するだけ
  * ネストしたトランザクション
- * Else
 
 == Concurrency
 
@@ -231,6 +254,7 @@ WithAbortContext
     if err != nil {
         log.Fatal(err)
     }
+    defer s.Close()
     e := concurrency.NewElection(s, "/chapter3/leader/")
 
     err = e.Campaign(context.TODO(), name)
@@ -261,28 +285,44 @@ Ctrl+Cを押してリーダーのプロセスを終了させてみてくださ�
 そこで、トランザクションのIf条件にリーダーキーが消えていないことを確認する条件をつけましょう。
 
 //listnum[leader_txn][リーダー選出後のトランザクション]{
-#@maprange(../code/chapter3/leader/leader.go,txn)
-    s, err = concurrency.NewSession(client)
+#@maprange(../code/chapter3/leader_txn/leader_txn.go,txn)
+    flag.Parse()
+    if flag.NArg() != 1 {
+        log.Fatal("usage: ./leader_txn NAME")
+    }
+    name := flag.Arg(0)
+    s, err := concurrency.NewSession(client, concurrency.WithTTL(10))
     if err != nil {
         log.Fatal(err)
     }
-    e = concurrency.NewElection(s, "/chapter3/leader/")
+    defer s.Close()
+    e := concurrency.NewElection(s, "/chapter3/leader_txn/")
 
 RETRY:
+    select {
+    case <-s.Done():
+        log.Fatal("session has been orphaned")
+    default:
+    }
     err = e.Campaign(context.TODO(), name)
     if err != nil {
         log.Fatal(err)
     }
     leaderKey := e.Key()
-    resp, err := client.Txn(context.TODO()).
+    resp, err := s.Client().Txn(context.TODO()).
         If(clientv3util.KeyExists(leaderKey)).
-        Then(clientv3.OpPut("/chapter3/leader/txn", "value")).
+        Then(clientv3.OpPut("/chapter3/leader_txn_value", "value")).
         Commit()
     if err != nil {
         log.Fatal(err)
     }
     if !resp.Succeeded {
         goto RETRY
+    }
+
+    err = e.Resign(context.TODO())
+    if err != nil {
+        log.Fatal(err)
     }
 #@end
 //}

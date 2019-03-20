@@ -22,18 +22,18 @@ func main() {
 	}
 	defer client.Close()
 
-	//#@@range_begin(tocttou)
+	//#@@range_begin(conflict)
 	addValue := func(d int) {
-		resp, _ := client.Get(context.TODO(), "/chapter3/tocttou")
+		resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
 		value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
 		value += d
-		client.Put(context.TODO(), "/chapter3/tocttou", strconv.Itoa(value))
+		client.Put(context.TODO(), "/chapter3/conflict", strconv.Itoa(value))
 	}
-	client.Put(context.TODO(), "/chapter3/tocttou", "10")
+	client.Put(context.TODO(), "/chapter3/conflict", "10")
 	go addValue(5)
 	go addValue(-3)
 	time.Sleep(1 * time.Second)
-	resp, _ := client.Get(context.TODO(), "/chapter3/tocttou")
+	resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
 	fmt.Println(string(resp.Kvs[0].Value))
-	//#@@range_end(tocttou)
+	//#@@range_end(conflict)
 }

@@ -32,7 +32,6 @@ func main() {
 		tresp, err := client.Txn(context.TODO()).
 			If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev)).
 			Then(clientv3.OpPut("/chapter3/txn", strconv.Itoa(value))).
-			Else().
 			Commit()
 		if err != nil {
 			log.Fatal(err)
