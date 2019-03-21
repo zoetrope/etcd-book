@@ -224,6 +224,124 @@ for _, m := range resp.Members {
 
 この他にもキーの数だけを返す@<code>{WithCountOnly}や、見つかった最初のキーだけを返す@<code>{WithFirstKey}などたくさんのオプションがあります。
 
+ページネーション
+
+=== MVCC (MultiVersion Concurrency Control)
+
+etcdはMVCC (MultiVersion Concurrency Control)モデルを採用したキーバリューストアです。
+すなわち、etcdに対して実施した変更はすべて履歴が保存されており、それぞれにリビジョン番号がつけられています。
+リビジョン番号を指定して値を読み出せば、過去の時点での値も読み出すことができます。
+
+ただし、すべての履歴を保存しているとディスク容量が逼迫してしまうため、適当なタイミングでコンパクションして古い履歴を削除するのが一般的です。
+
+では、具体的にリビジョン番号が更新されていく様子を見てみましょう。
+
+その前に@<code>{client.Get()}の結果を詳しく表示するヘルパー関数を用意しておきます。
+
+//listnum[mvcc-print][]{
+#@maprange(../code/chapter2/revision/revision.go,print)
+func printResponse(resp *clientv3.GetResponse) {
+    fmt.Println("header: " + resp.Header.String())
+    for i, kv := range resp.Kvs {
+        fmt.Printf("kv[%d]: %s\n", i, kv.String())
+    }
+    fmt.Println()
+}
+
+#@end
+//}
+
+では書き込んだ値を取得して、その結果を表示してみましょう。
+
+//list[mvcc-rev1][]{
+#@maprange(../code/chapter2/revision/revision.go,rev1)
+    client.Put(context.TODO(), "/chapter2/rev/1", "123")
+    resp, _ := client.Get(context.TODO(), "/chapter2/rev", clientv3.WithPrefix())
+    printResponse(resp)
+#@end
+//}
+
+実行すると以下のように表示されます。
+
+//terminal{
+header: cluster_id:14841639068965178418 member_id:10276657743932975437 revision:41 raft_term:2 
+kv[0]: key:"/chapter2/rev/1" create_revision:41 mod_revision:41 version:1 value:"123" 
+//}
+
+@<code>{header}の中に@<code>{revision}というフィールドが見つかります。
+
+: revision
+    etcdのリビジョン番号。クラスタ全体で一つの値が利用される。etcdに何らかの変更(キーの追加、変更、削除)が加えられると値が1増える。
+
+キーバリューの中には以下のフィールドが見つかります。
+
+: create_revision
+    このキーが作成されたときのリビジョン番号。
+: mod_revision
+    このキーの内容が最後に変更されたときのリビジョン番号。
+: version
+    このキーのバージョン。このキーに変更が加えられると値が1増える。
+
+次に@<code>{/chapter2/rev/1}の値を更新してみましょう。
+
+//list[mvcc-rev2][]{
+#@maprange(../code/chapter2/revision/revision.go,rev2)
+    client.Put(context.TODO(), "/chapter2/rev/1", "456")
+    resp, _ = client.Get(context.TODO(), "/chapter2/rev", clientv3.WithPrefix())
+    printResponse(resp)
+#@end
+//}
+
+@<code>{revision}, @<code>{mod_revision}, @<code>{version}の値が1つ増え、
+@<code>{create_revision}はそのままの値になっています。
+
+//terminal{
+header: cluster_id:14841639068965178418 member_id:10276657743932975437 revision:42 raft_term:2 
+kv[0]: key:"/chapter2/rev/1" create_revision:41 mod_revision:42 version:2 value:"456" 
+//}
+
+次に別のキー@<code>{/chapter2/rev/2}に値を書き込んでみましょう。
+
+//list[mvcc-rev3][]{
+#@maprange(../code/chapter2/revision/revision.go,rev3)
+    client.Put(context.TODO(), "/chapter2/rev/2", "999")
+    resp, _ = client.Get(context.TODO(), "/chapter2/rev", clientv3.WithPrefix())
+    printResponse(resp)
+#@end
+//}
+
+このときの情報を見ると@<code>{header}の@<code>{revision}は増加し、
+@<code>{/chapter2/rev/1}の@<code>{mod_revision}, @<code>{version}, @<code>{create_revision}は値が変化していません。
+一方、@<code>{/chapter2/rev/2}の@<code>{mod_revision}, @<code>{create_revision}は最新の@<code>{revision}になり、
+@<code>{version}は1になっていることがわかります。
+
+//terminal{
+header: cluster_id:14841639068965178418 member_id:10276657743932975437 revision:43 raft_term:2 
+kv[0]: key:"/chapter2/rev/1" create_revision:41 mod_revision:42 version:2 value:"456" 
+kv[1]: key:"/chapter2/rev/2" create_revision:43 mod_revision:43 version:1 value:"999" 
+//}
+
+続いて@<code>{/chapter2/rev/1}が作成された時点でのリビジョン番号(41)を指定して値を読み出してみましょう。
+リビジョンを指定して値を読み出すためには、@<code>{clientv3.WithRev()}を利用します。
+
+//list[mvcc-withrev][]{
+#@maprange(../code/chapter2/revision/revision.go,withrev)
+    resp, _ = client.Get(context.TODO(), "/chapter2/rev",
+        clientv3.WithPrefix(), clientv3.WithRev(resp.Kvs[0].CreateRevision))
+    printResponse(resp)
+#@end
+//}
+
+実行すると@<code>{/chapter2/rev/1}が作成されたときの値@<code>{123}が取得できています。
+このリビジョンの時点では@<code>{/chapter2/rev/2}は存在しなかったため、値が取得できていないことがわかります。
+
+//terminal{
+header: cluster_id:14841639068965178418 member_id:10276657743932975437 revision:43 raft_term:2 
+kv[0]: key:"/chapter2/rev/1" create_revision:41 mod_revision:41 version:1 value:"123" 
+//}
+
+ここで説明したリビジョンは、後ほど解説するWatchやTransactionでも利用することになります。
+
 == context
 
 etcdのクライアントが提供している多くのメソッドは、第一引数に@<code>{context.Context}を受けるようになっています。
