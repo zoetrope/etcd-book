@@ -290,18 +290,6 @@ Ctrl+Cを押してリーダーのプロセスを終了させてみてくださ�
 
 //listnum[leader_txn][リーダー選出後のトランザクション]{
 #@maprange(../code/chapter3/leader_txn/leader_txn.go,txn)
-    flag.Parse()
-    if flag.NArg() != 1 {
-        log.Fatal("usage: ./leader_txn NAME")
-    }
-    name := flag.Arg(0)
-    s, err := concurrency.NewSession(client, concurrency.WithTTL(10))
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer s.Close()
-    e := concurrency.NewElection(s, "/chapter3/leader_txn")
-
 RETRY:
     select {
     case <-s.Done():
@@ -323,11 +311,6 @@ RETRY:
     if !resp.Succeeded {
         goto RETRY
     }
-
-    err = e.Resign(context.TODO())
-    if err != nil {
-        log.Fatal(err)
-    }
 #@end
 //}
 
@@ -337,7 +320,7 @@ RETRY:
 //listnum[leader_watch][リーダーチェック]{
 #@maprange(../code/chapter3/leader_watch/leader_watch.go,watch)
 func watchLeader(ctx context.Context, s *concurrency.Session, leaderKey string) error {
-    ch := s.Client().Watch(ctx, leaderKey)
+    ch := s.Client().Watch(ctx, leaderKey, clientv3.WithFilterPut())
     for {
         select {
         case <-s.Done():
@@ -357,6 +340,7 @@ func watchLeader(ctx context.Context, s *concurrency.Session, leaderKey string) 
         }
     }
 }
+
 #@end
 //}
 

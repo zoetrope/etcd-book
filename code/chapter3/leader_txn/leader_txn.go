@@ -23,7 +23,6 @@ func main() {
 	}
 	defer client.Close()
 
-	//#@@range_begin(txn)
 	flag.Parse()
 	if flag.NArg() != 1 {
 		log.Fatal("usage: ./leader_txn NAME")
@@ -36,6 +35,7 @@ func main() {
 	defer s.Close()
 	e := concurrency.NewElection(s, "/chapter3/leader_txn")
 
+	//#@@range_begin(txn)
 RETRY:
 	select {
 	case <-s.Done():
@@ -57,10 +57,10 @@ RETRY:
 	if !resp.Succeeded {
 		goto RETRY
 	}
+	//#@@range_end(txn)
 
 	err = e.Resign(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
-	//#@@range_end(txn)
 }

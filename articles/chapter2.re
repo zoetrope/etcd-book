@@ -1,23 +1,27 @@
 = etcdプログラミングの基本
 
+本章以降ではetcdのクライアントライブラリを利用して、Go言語でetcdを操作するプログラムの書き方を紹介していきます。
+ここではまず、etcdに接続するクライアントをの作り方と、それを利用したキー・バリューの読み書きの方法、
+さらにキー・バリューの変更を監視する方法や、キーに有効期限を指定する方法を紹介します。
+
 == クライアントを用意する
 
 それではさっそくGo言語によるetcdプログラミングをはじめましょう。
 
 Go言語の開発環境はセットアップ済みですか？
-もしセットアップが完了していないのであれば、@<href>{https://golang.org/doc/install}を開き、
-利用しているOS向けのバイナリをダウンロードしてきてください。
+もしセットアップが完了していないのであれば、@<href>{https://golang.org/doc/install}を開き、利用しているOS向けのバイナリをダウンロードしてきてください。
 
-Go言語のバージョンを確認しておきましょうか。
-本書ではGo 1.12を利用します。
-本書のサンプルコードは古いGoでも動くとは思いますが、最新版を利用することをおすすめします。
+Goのバージョンを確認しておきましょうか。
 
 //terminal{
 $ go version
-go version go1.12 linux/amd64
+go version go1.12.1 linux/amd64
 //}
 
-それではetcdにアクセスするGo言語のプログラムを書いてみましょう。
+本書ではGo 1.12.1を利用します。
+本書のコードは古いGoでも動くとは思いますが、最新版を利用することをおすすめします。
+
+ではetcdにアクセスするプログラムを書いてみましょう。
 以下のようなファイルを作成し、client.goという名前で保存してください。
 
 //listnum[client][クライアントの作成]{
@@ -56,7 +60,7 @@ func main() {
 #@end
 //}
 
-次にこのコードをコンパイルします。何もエラーメッセージが表示されなければ成功です。
+次にこのコードをコンパイルします。何もエラーメッセージが表示されず、実行ファイルが生成されていれば成功です。
 
 //terminal{
 $ go build client.go
@@ -65,7 +69,7 @@ $ go build client.go
 etcdは起動したままになっていますか？ 
 もし起動していないようなら@<chap>{chapter1}に戻って起動してきてください。
 
-コンパイルしたプログラムを実行してみましょう。
+etcdが起動しているコンピュータ上で、コンパイルしたプログラムを実行してみましょう。
 以下のようなメッセージが表示されれば成功です。
 このプログラムでは、etcdクラスタを構成するメンバーの情報を表示しています。
 
@@ -84,28 +88,77 @@ $ ./client
 
 ではソースコードの解説をしていきます。
 
-まず@<code>{github.com/coreos/etcd/clientv3}をインポートしています@<fn>{package}。これは
+まず@<code>{github.com/coreos/etcd/clientv3}をインポートしています。
+これによりetcdのクライアントライブラリが利用できるようになります。
 
-//footnote[package][etcd v3.3までは@<code>{github.com/coreos/etcd/clientv3}ですが、etcd v3.4から@<code>{github.com/etcd-io/etcd/clientv3}に変わるので注意してください。]
+//list[import][]{
+import (
+    "github.com/coreos/etcd/clientv3"
+)
+//}
 
-次に@<code>{clientv3.Config}型の変数を用意しています。
+//note[パッケージ名が変わります]{
+etcd v3.3までのパッケージ名は@<code>{github.com/coreos/etcd/clientv3}ですが、etcd v3.4から@<code>{github.com/etcd-io/etcd/clientv3}に変わるので注意してください。
+//}
+
+次に@<code>{main}関数の中を見ていきましょう。
+@<code>{clientv3.Config}型の変数を用意しています。
 これはetcdに接続するときに利用する設定で、接続先のアドレスや接続時のタイムアウト時間などを指定できます。
+ここではlocalhost上の2379番ポートに接続し、接続タイムアウト時間が3秒になるように設定しています。
+
+//list[config][]{
+cfg := clientv3.Config{
+    Endpoints:   []string{"http://localhost:2379"},
+    DialTimeout: 3 * time.Second,
+}
+//}
 
 この設定を利用して、@<code>{clientv3.New()}でクライアントを作成します。
-このとき、etcdとの接続に失敗するとエラーが返ってきます。
+このとき、etcdとの接続に失敗するとエラーが返ってくるのでエラー処理をしましょう。
+また、etcdとのやり取りが完了したときに@<code>{client.Close()}を呼び出すようにしておきます。
 
-最後に作成したクライアントを利用して、@<code>{MemberList()}
+//list[client.new][]{
+client, err := clientv3.New(cfg)
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close()
+//}
 
-== KV
+最後に作成したクライアントを利用して、@<code>{MemberList()}を呼び出し、その結果を画面に表示しています。
+このとき引数に@<code>{context.TODO()}を渡していますが、@<code>{context}については後ほど詳しく解説します。
+
+//list[memberlist][]{
+resp, err := client.MemberList(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+for _, m := range resp.Members {
+    fmt.Printf("%s\n", m.String())
+}
+//}
+
+このように、クライアントを作成しそれを利用して必要なAPIを呼び出すのが、etcdプログラミングの基本的な流れになります。
+
+== Key Value
+では、先ほど作成したクライアントを利用して、etcdにデータを書き込んでみましょう。
+
+@<list>{client}のファイルをコピーし、@<code>{MemberList()}を呼び出す代わりに以下のようなコードを書いてみます。
 
 //listnum[kv-write][データの書き込み]{
 #@maprange(../code/chapter2/kv/kv.go,write)
-    _, err = client.Put(context.TODO(), "/chapter2/kv", "value")
+    _, err = client.Put(context.TODO(), "/chapter2/kv", "my-value")
     if err != nil {
         log.Fatal(err)
     }
 #@end
 //}
+
+これを実行すると@<code>{/chapter2/kv}というキーに@<code>{my-value}という値が書き込まれます。
+なお、@<code>{Put}を利用すると、指定したキーがなければ新しくデータが作成され、キーが存在していればその値が更新されることになります。
+
+では、書き込んだ値が正しく読み込めるかどうか試してみましょう。
+先程のコードの続きに以下の処理を追加します。
 
 //listnum[kv-read][データの読み込み]{
 #@maprange(../code/chapter2/kv/kv.go,read)
@@ -114,11 +167,27 @@ $ ./client
         log.Fatal(err)
     }
     if resp.Count == 0 {
-        log.Fatal(err)
+        log.Fatal("/chapter2/kv not found")
     }
     fmt.Println(string(resp.Kvs[0].Value))
 #@end
 //}
+
+このコードを実行すると、書き込んだ値が読み込まれて@<code>{my-value}が表示されることでしょう。
+もし書き込みや読み込みが失敗した場合は何らかのエラーメッセージが表示されます。
+
+次に書き込んだ値を削除してみましょう。
+
+//listnum[kv-delete][データの削除]{
+#@maprange(../code/chapter2/kv/kv.go,delete)
+    _, err = client.Delete(context.TODO(), "/chapter2/kv")
+    if err != nil {
+        log.Fatal(err)
+    }
+#@end
+//}
+
+値を削除した後に読み込もうとしても、キーが見つからないという結果になるでしょう。
 
 == Option
 
@@ -160,9 +229,7 @@ $ ./client
 etcdのクライアントが提供している多くのメソッドは、第一引数に@<code>{context.Context}を受けるようになっています。
 
 @<code>{context.Context}は、ブロッキング処理や時間のかかる処理など、
-タイムアウトさせたり、キャンセルさせるために利用される機構です@<fn>{context}。
-
-//footnote[context][context.Contextはキャンセルの伝搬だけでなく値の共有にも利用できますが、ここでは説明は割愛します。]
+タイムアウトさせたり、キャンセルさせるために利用される機構です。
 
 etcdクライアントは、etcdサーバーとの通信をおこなうため、
 リクエストを投げてからどれくらいの時間で返ってくるかはわかりません。その間の処理はブロックされることになります。
@@ -197,15 +264,12 @@ $ sudo tc qdisc add dev $VETH root netem delay 3s
 //}
 
 もう一度プログラムを実行してみましょう。
-少し待つと"context deadline exceedef"というメッセージが表示されてプログラムが終了するはずです。
+少し待つと"context deadline exceeded"というメッセージが表示されてプログラムが終了するはずです。
 
 //terminal{
 $ VETH=$(sudo ./chapter6/veth.sh etcd)
 $ sudo tc qdisc del dev $VETH root
 //}
-
-
-
 
 本書では@<code>{context.TODO()}を利用していますが、実際にコードを書くときには適切なコンテキストを利用してください@<fn>{todo}。
 

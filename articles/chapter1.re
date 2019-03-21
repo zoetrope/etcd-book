@@ -80,6 +80,11 @@ namepaceや、アクセス権の
  * /registry/pods/default/mypod
  * /registry/services/kube-system/default
 
+=== バリュー
+
+値にはJSONやProtocol Buffer
+最大1MB
+
 === RevisionとVersion
 
 MVCC (MultiVersion Concurrency Control)

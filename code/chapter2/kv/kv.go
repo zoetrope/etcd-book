@@ -22,7 +22,7 @@ func main() {
 	defer client.Close()
 
 	//#@@range_begin(write)
-	_, err = client.Put(context.TODO(), "/chapter2/kv", "value")
+	_, err = client.Put(context.TODO(), "/chapter2/kv", "my-value")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,8 +34,15 @@ func main() {
 		log.Fatal(err)
 	}
 	if resp.Count == 0 {
-		log.Fatal(err)
+		log.Fatal("/chapter2/kv not found")
 	}
 	fmt.Println(string(resp.Kvs[0].Value))
 	//#@@range_end(read)
+
+	//#@@range_begin(delete)
+	_, err = client.Delete(context.TODO(), "/chapter2/kv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	//#@@range_end(delete)
 }
