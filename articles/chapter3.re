@@ -47,7 +47,6 @@ Transactionを利用したコードに書き換えてみましょう。
         tresp, err := client.Txn(context.TODO()).
             If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev)).
             Then(clientv3.OpPut("/chapter3/txn", strconv.Itoa(value))).
-            Else().
             Commit()
         if err != nil {
             log.Fatal(err)
@@ -76,7 +75,7 @@ Transactionを利用したコードに書き換えてみましょう。
 そして最後にtresp.Succeededをチェックしています。
 この値はIfの条件が成立した場合にtrueになります。
 
- * いろいろなif条件
+=== いろいろなif条件
  ** ターゲット
  *** Value
  *** Version
@@ -90,9 +89,14 @@ Transactionを利用したコードに書き換えてみましょう。
  *** ">"
  ** KeyMissing
  ** KeyExists
- * Else
- * 複数の処理を同時実行するだけ
- * ネストしたトランザクション
+=== Else
+=== 複数の処理を同時実行するだけ
+ ** OpGet
+ ** OpPut
+ ** OpDelete
+ ** OpTxn
+ ** OpCompact
+=== ネストしたトランザクション
 
 == Concurrency
 
@@ -255,7 +259,7 @@ WithAbortContext
         log.Fatal(err)
     }
     defer s.Close()
-    e := concurrency.NewElection(s, "/chapter3/leader/")
+    e := concurrency.NewElection(s, "/chapter3/leader")
 
     err = e.Campaign(context.TODO(), name)
     if err != nil {
@@ -296,7 +300,7 @@ Ctrl+Cを押してリーダーのプロセスを終了させてみてくださ�
         log.Fatal(err)
     }
     defer s.Close()
-    e := concurrency.NewElection(s, "/chapter3/leader_txn/")
+    e := concurrency.NewElection(s, "/chapter3/leader_txn")
 
 RETRY:
     select {
@@ -326,3 +330,35 @@ RETRY:
     }
 #@end
 //}
+
+上述したように、リーダーに選出された後も様々な理由でリーダーではなくなる可能性があります。
+そこで自身がリーダーでなくなったことを検出したくなると思います。
+
+//listnum[leader_watch][リーダーチェック]{
+#@maprange(../code/chapter3/leader_watch/leader_watch.go,watch)
+func watchLeader(ctx context.Context, s *concurrency.Session, leaderKey string) error {
+    ch := s.Client().Watch(ctx, leaderKey)
+    for {
+        select {
+        case <-s.Done():
+            return errors.New("session is closed")
+        case resp, ok := <-ch:
+            if !ok {
+                return errors.New("watch is closed")
+            }
+            if resp.Err() != nil {
+                return resp.Err()
+            }
+            for _, ev := range resp.Events {
+                if ev.Type == clientv3.EventTypeDelete {
+                    return errors.New("leader key is deleted")
+                }
+            }
+        }
+    }
+}
+#@end
+//}
+
+この関数はetcdと通信ができずにセッションが切れた場合や、リーダーキーが削除された場合、contextによって処理が中断された場合にエラーを返します。
+エラーが返ってきたらこのプロセスはリーダーではなくなったということなので、再度リーダー選出からやり直したり、プログラムを終了させるなど適切な対応をおこないましょう。

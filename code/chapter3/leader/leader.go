@@ -34,7 +34,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer s.Close()
-	e := concurrency.NewElection(s, "/chapter3/leader/")
+	e := concurrency.NewElection(s, "/chapter3/leader")
 
 	err = e.Campaign(context.TODO(), name)
 	if err != nil {

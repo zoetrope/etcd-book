@@ -34,7 +34,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer s.Close()
-	e := concurrency.NewElection(s, "/chapter3/leader_txn/")
+	e := concurrency.NewElection(s, "/chapter3/leader_txn")
 
 RETRY:
 	select {

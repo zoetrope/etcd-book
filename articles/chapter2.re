@@ -261,6 +261,7 @@ revを指定してWatchを開始しした場合、その値はすでにコンパ
 何に使えるか。
 一時的にログを蓄えておきたい(Kubernetesのkube-apiserverの--event-ttlとか)
 セッション情報とか
+後述するMutexやLeader Electionでも使ってる。
 
 //listnum[lease][キーの有効期限を設定]{
 #@maprange(../code/chapter2/lease/lease.go,lease)
