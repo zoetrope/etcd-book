@@ -21,12 +21,12 @@ func main() {
 	}
 	defer client.Close()
 	//#@@range_begin(read)
-	client.Put(context.TODO(), "/chapter2/option/key3", "hoge")
-	client.Put(context.TODO(), "/chapter2/option/key1", "foo")
-	client.Put(context.TODO(), "/chapter2/option/key2", "bar")
+	client.Put(context.TODO(), "/chapter2/option/key3", "val2")
+	client.Put(context.TODO(), "/chapter2/option/key1", "val3")
+	client.Put(context.TODO(), "/chapter2/option/key2", "val1")
 	resp, err := client.Get(context.TODO(), "/chapter2/option/",
 		clientv3.WithPrefix(),
-		clientv3.WithSort(clientv3.SortByModRevision, clientv3.SortDescend),
+		clientv3.WithSort(clientv3.SortByValue, clientv3.SortAscend),
 		clientv3.WithKeysOnly(),
 	)
 	if err != nil {

@@ -191,14 +191,17 @@ for _, m := range resp.Members {
 
 == Option
 
+@<code>{client.Put()}, @<code>{client.Get()}, @<code>{client.Delete()}にはいろいろなオプションを指定することができます。
+ここでは@<code>{client.Get()}を例に上げていくつかのオプションをみてみましょう。
+
 //listnum[opts-read][オプションの指定]{
 #@maprange(../code/chapter2/opts/opts.go,read)
-    client.Put(context.TODO(), "/chapter2/option/key3", "hoge")
-    client.Put(context.TODO(), "/chapter2/option/key1", "foo")
-    client.Put(context.TODO(), "/chapter2/option/key2", "bar")
+    client.Put(context.TODO(), "/chapter2/option/key3", "val2")
+    client.Put(context.TODO(), "/chapter2/option/key1", "val3")
+    client.Put(context.TODO(), "/chapter2/option/key2", "val1")
     resp, err := client.Get(context.TODO(), "/chapter2/option/",
         clientv3.WithPrefix(),
-        clientv3.WithSort(clientv3.SortByModRevision, clientv3.SortDescend),
+        clientv3.WithSort(clientv3.SortByValue, clientv3.SortAscend),
         clientv3.WithKeysOnly(),
     )
     if err != nil {
@@ -210,23 +213,22 @@ for _, m := range resp.Members {
 #@end
 //}
 
-実行結果は次のようになります。
+このコードの実行結果は次のようになります。
 
 //terminal{
 /chapter2/option/key2: 
-/chapter2/option/key1: 
 /chapter2/option/key3: 
+/chapter2/option/key1: 
 //}
 
-まず@<code>{WithPrefix}を指定すると、キーに指定したプレフィックス(ここでは/mykey/)から始まるキーをすべて取得しています。
-次に@<code>{WithSort}を指定すると結果をソートすることができます。ここではModRevisionの降順、すなわち編集されたのが新しい順にキーを取得しています。
+まず@<code>{WithPrefix}を指定すると、キーに指定したプレフィックス(ここでは@<code>{/chapter2/option})から始まるキーをすべて取得します。
+次に@<code>{WithSort}を指定すると結果をソートすることができます。ここではValueの昇順で並び替えをおこないます。
 最後の@<code>{WithKeysOnly}を指定すると、キーのみを取得します。そのため結果に値が出力されていません。
 
 この他にもキーの数だけを返す@<code>{WithCountOnly}や、見つかった最初のキーだけを返す@<code>{WithFirstKey}などたくさんのオプションがあります。
+ぜひ@<href>{https://godoc.org/github.com/coreos/etcd/clientv3#OpOption}を一度みてください。
 
-ページネーション
-
-=== MVCC (MultiVersion Concurrency Control)
+== MVCC (MultiVersion Concurrency Control)
 
 etcdはMVCC (MultiVersion Concurrency Control)モデルを採用したキーバリューストアです。
 すなわち、etcdに対して実施した変更はすべて履歴が保存されており、それぞれにリビジョン番号がつけられています。
@@ -333,7 +335,8 @@ kv[1]: key:"/chapter2/rev/2" create_revision:43 mod_revision:43 version:1 value:
 //}
 
 実行すると@<code>{/chapter2/rev/1}が作成されたときの値@<code>{123}が取得できています。
-このリビジョンの時点では@<code>{/chapter2/rev/2}は存在しなかったため、値が取得できていないことがわかります。
+このリビジョンの時点では@<code>{/chapter2/rev/2}は存在しなかったため、その値は取得できませんでした。
+またこのとき@<code>{header}の@<code>{revision}は、指定したリビジョンではなく最新のリビジョン番号が入っていることに注意しましょう。
 
 //terminal{
 header: cluster_id:14841639068965178418 member_id:10276657743932975437 revision:43 raft_term:2 
@@ -346,13 +349,13 @@ kv[0]: key:"/chapter2/rev/1" create_revision:41 mod_revision:41 version:1 value:
 
 etcdのクライアントが提供している多くのメソッドは、第一引数に@<code>{context.Context}を受けるようになっています。
 
-@<code>{context.Context}は、ブロッキング処理や時間のかかる処理など、
-タイムアウトさせたり、キャンセルさせるために利用される機構です。
+@<code>{context.Context}は、Go言語においてブロッキング処理などの時間のかかる処理を、タイムアウトさせたりキャンセルさせるために利用される機構です。
 
 etcdクライアントは、etcdサーバーとの通信をおこなうため、
 リクエストを投げてからどれくらいの時間で返ってくるかはわかりません。その間の処理はブロックされることになります。
+そのため、処理を中断したいようなケースでは@<code>{context}を利用することになります。
 
-それではcontextを利用して処理をキャンセルする例をみてみましょう。
+それでは@<code>{context}を利用して処理をキャンセルする例をみてみましょう。
 
 //listnum[context][処理のキャンセル]{
 #@maprange(../code/chapter2/timeout/timeout.go,timeout)
@@ -366,7 +369,7 @@ etcdクライアントは、etcdサーバーとの通信をおこなうため、
 #@end
 //}
 
-この例では1秒でタイムアウトするcontextを作り、@<code>{client.Get()}の第一引数に渡しています。
+この例では1秒でタイムアウトする@<code>{context}を作り、@<code>{client.Get()}の第一引数に渡しています。
 これにより、@<code>{client.Get()}に時間がかかっていた場合、1秒経過すると途中で処理を終了します。
 処理が途中で終了した場合、@<code>{client.Get()}はエラーを返します。
 
@@ -383,6 +386,9 @@ $ sudo tc qdisc add dev $VETH root netem delay 3s
 
 もう一度プログラムを実行してみましょう。
 少し待つと"context deadline exceeded"というメッセージが表示されてプログラムが終了するはずです。
+このようなタイムアウト処理を利用すると、例えばネットワークの調子が悪いときに、処理を中断して管理者に通知を飛ばすような仕組みを構築することも可能になります。
+
+遅延させたままでは困るので、もとに戻しておきましょう。
 
 //terminal{
 $ VETH=$(sudo ./chapter6/veth.sh etcd)
@@ -423,18 +429,34 @@ Errを返すケース
 * クライアントをCloseするなど監視を終了した場合
 * Compactionされた場合
 
-WithPrefix
-WithRev
-WithPrevKV
-WithProgressNotify
-WithCreatedNotify
-WithFilterPut
-WithFilterDelete
 
+//listnum[watch_rev][変更の監視]{
+#@maprange(../code/chapter2/watch_rev/watch_rev.go,watch_rev)
+    resp, err := client.Get(context.TODO(), "/chapter2/watch_rev")
+    if err != nil || resp.Count == 0 {
+        log.Fatal(err)
+    }
+    fmt.Printf("processed: %s\n", resp.Kvs[0].Value)
+    rev := resp.Kvs[0].ModRevision
+    time.Sleep(300 * time.Millisecond)
+    ch := client.Watch(context.TODO(), "/chapter2/watch_rev", clientv3.WithRev(rev+1))
+    for resp := range ch {
+        if resp.Err() != nil {
+            log.Fatal(resp.Err())
+        }
+        for _, ev := range resp.Events {
+            fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+        }
+    }
+#@end
+//}
 まずGetで値を取ってきて処理。その後にwatchを開始。
-GetとWatchの間にもし値が変更されていたら、値を取りこぼすことになってしまいます。
+Watchを呼び出すと、呼び出した時点からの変更が通知されることになります。
+Getで処理をしてからWatchを呼び出すまでの間にもし値が変更されていたら、その変更を取りこぼすことになってしまいます。
 データを取りこぼさないようにWithRevを利用する。
 最後に読み取ったrevの値をファイルなどに書き出しておいてもよいでしょう。
+
+プログラムを一旦停止して、前回の続きから処理を再開したいケースもある
 
 revを指定してWatchを開始しした場合、その値はすでにコンパクションされている可能性もあります。
 
@@ -513,4 +535,3 @@ $ ./lease
     }
 //}
 
-== Namespace

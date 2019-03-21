@@ -106,6 +106,8 @@ $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd1 etcdctl --endpoints=http:/
 
 1つめに指定したメンバーにアクセスできない場合、他のメンバーに接続してくれない問題がある。
 
+== Namespace
+
 == ユーザー
 
 == スナップショット
@@ -130,3 +132,4 @@ $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd1 etcdctl --endpoints=http:/
  * balancer (etcd v3.4)
  * leasing
  * ordering
+ * gRPC Proxy(Scalable Watch API)

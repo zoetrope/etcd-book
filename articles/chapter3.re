@@ -120,7 +120,6 @@ MutexやLeaderElectionで利用する。
     }
     fmt.Println("acquired lock")
     time.Sleep(5 * time.Second)
-    m.IsOwner()
     err = m.Unlock(context.TODO())
     if err != nil {
         log.Fatal(err)
@@ -142,6 +141,11 @@ OSが提供するMutexとは異なり
 //listnum[owner][IsOwner]{
 #@maprange(../code/chapter3/mutex/mutex.go,owner)
 RETRY:
+    select {
+    case <-s.Done():
+        log.Fatal("session has been orphaned")
+    default:
+    }
     err = m.Lock(context.TODO())
     if err != nil {
         log.Fatal(err)
@@ -153,10 +157,15 @@ RETRY:
     if err != nil {
         log.Fatal(err)
     }
-    m.Unlock(context.TODO())
     if resp.Succeeded {
         fmt.Println("the lock was not acquired")
+        m.Unlock(context.TODO())
         goto RETRY
+    }
+    // do something
+    err = m.Unlock(context.TODO())
+    if err != nil {
+        log.Fatal(err)
     }
 #@end
 //}
