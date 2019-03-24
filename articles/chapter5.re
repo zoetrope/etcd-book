@@ -85,6 +85,7 @@ https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubern
 この機能を利用してetcdのメトリクスも収集してもらいましょう。
 このとき、etcdのPodにアノテーションを付与する必要があります。
 
+また、
 
 //listnum[etcd-cluster][etcd-cluster.yml]{
 #@mapfile(../code/chapter5/prometheus/etcd-cluster.yml)
@@ -100,6 +101,9 @@ spec:
       prometheus.io/scrape: 'true'
       prometheus.io/port: '2379'
       prometheus.io/metrics: /metrics
+    etcdEnv:
+      - name: ETCD_METRICS
+        value: "extensive"
 #@end
 //}
 
@@ -107,7 +111,83 @@ spec:
 $ kubectl apply -f etcd-cluster.yml
 //}
 
-https://grafana.com/dashboards/3070
+どのようなメトリクスが取れるのか実行してみましょう。
+
+//terminal{
+$ ETCD_ENDPOINT=$(minikube service example-etcd-cluster-client-service --url)
+$ curl $ETCD_ENDPOINT/metrics
+//}
+
+メトリクス情報が正しく表示されたでしょうか？非常にたくさんの項目が存在することがわかると思います。
+etcdで取得できるメトリクスは頻繁に仕様が変化している@<fn>{metrics3.4}ため、自身の環境でどのようなメトリクスが収集されているのかを把握しておくことが大切です。
+
+//footnote[metrics3.4][etcd v3.4でも多くのメトリクスの追加が予定されています。]
+
+
+@<code>{up\{app="etcd"\}}
+
+//terminal{
+up{app="etcd",etcd_cluster="example-etcd-cluster",etcd_node="example-etcd-cluster-lsrhl4k5lk",instance="172.17.0.13:2379",job="kubernetes-pods",kubernetes_namespace="default",kubernetes_pod_name="example-etcd-cluster-lsrhl4k5lk"}      1
+up{app="etcd",etcd_cluster="example-etcd-cluster",etcd_node="example-etcd-cluster-pc8q9hrkv6",instance="172.17.0.14:2379",job="kubernetes-pods",kubernetes_namespace="default",kubernetes_pod_name="example-etcd-cluster-pc8q9hrkv6"}      1
+up{app="etcd",etcd_cluster="example-etcd-cluster",etcd_node="example-etcd-cluster-ql7lhq9pcf",instance="172.17.0.15:2379",job="kubernetes-pods",kubernetes_namespace="default",kubernetes_pod_name="example-etcd-cluster-ql7lhq9pcf"}      1
+//}
+
+//terminal{
+etcd_server_has_leader{app="etcd",etcd_cluster="example-etcd-cluster",etcd_node="example-etcd-cluster-cv9q5clmww",instance="172.17.0.14:2379",job="kubernetes-pods",kubernetes_namespace="default",kubernetes_pod_name="example-etcd-cluster-cv9q5clmww"}
+etcd_server_has_leader{app="etcd",etcd_cluster="example-etcd-cluster",etcd_node="example-etcd-cluster-ggt54cqqlc",instance="172.17.0.13:2379",job="kubernetes-pods",kubernetes_namespace="default",kubernetes_pod_name="example-etcd-cluster-ggt54cqqlc"}
+etcd_server_has_leader{app="etcd",etcd_cluster="example-etcd-cluster",etcd_node="example-etcd-cluster-sbc488shd4",instance="172.17.0.15:2379",job="kubernetes-pods",kubernetes_namespace="default",kubernetes_pod_name="example-etcd-cluster-sbc488shd4"}
+//}
+
+ * alertmanagerとprometheus-serverのサービスをNodePortに変更
+ * alertのrulesを追加
+
+//list[][prometheus-values.yml]{
+#@maprange(../code/chapter5/prometheus/prometheus-values.yml,noleader)
+serverFiles:
+  alerts:
+    groups:
+      - name: etcd
+        rules:
+          - alert: LackMember
+            expr: absent(up{app="etcd", etcd_cluster="example-etcd-cluster"}) OR count(up{app="etcd", etcd_cluster="example-etcd-cluster"}==1} < 2
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "etcd cluster member lost"
+              description: "{{ $labels.etcd_cluster }}, member: {{ $labels.etcd_node }}"
+          - alert: NoLeader
+            expr: etcd_server_has_leader{app="etcd"} != 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "etcd cluster lost leader"
+              description: "{{ $labels.etcd_cluster }} has no leader"
+#@end
+//}
+
+ * helmでprometheusの設定を更新
+
+//terminal{
+helm upgrade --namespace monitoring -f prometheus-values.yml prometheus stable/prometheus
+//}
+
+ * prometheus-serverをブラウザで開いてみる。alertsタブを開いて設定したアラートがあれば成功。
+ * アラートの発生条件を達成するとActiveになる。
+
+//terminal{
+$ minikube service -n monitoring prometheus-server --url
+http://192.168.99.100:31149
+//}
+
+ * alertmanagerをブラウザで開く。
+ * アラートが発生していれば、アラートが表示される。ここまで確認しなくてもいいか？
+
+//terminal{
+$ minikube service -n monitoring prometheus-alertmanager --url                                           │
+http://192.168.99.100:32624 
+//}
 
 == etcdadm
 

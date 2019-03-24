@@ -10,3 +10,6 @@ spec:
       prometheus.io/scrape: 'true'
       prometheus.io/port: '2379'
       prometheus.io/metrics: /metrics
+    etcdEnv:
+      - name: ETCD_METRICS
+        value: "extensive"

@@ -947,11 +947,34 @@ alertmanagerFiles:
 
 ## Prometheus server ConfigMap entries
 ##
+#@range_begin(noleader)
 serverFiles:
+  alerts: 
+    groups:
+      - name: etcd
+        rules:
+          - alert: LackMember
+            expr: absent(up{app="etcd", etcd_cluster="example-etcd-cluster"}) OR count(up{app="etcd", etcd_cluster="example-etcd-cluster"}==1} < 2
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "etcd cluster member lost"
+              description: "{{ $labels.etcd_cluster }}, member: {{ $labels.etcd_node }}"
+          - alert: NoLeader
+            expr: etcd_server_has_leader{app="etcd"} != 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "etcd cluster lost leader"
+              description: "{{ $labels.etcd_cluster }} has no leader"
+#@range_end(noleader)
 
   ## Alerts configuration
   ## Ref: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
-  alerts: {}
+  ## alerts: {}
+
   # groups:
   #   - name: Instances
   #     rules:
@@ -1249,4 +1272,3 @@ networkPolicy:
   ## Enable creation of NetworkPolicy resources.
   ##
   enabled: false
-
