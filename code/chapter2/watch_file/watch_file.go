@@ -77,9 +77,9 @@ func main() {
 		if resp.Err() != nil {
 			log.Fatal(resp.Err())
 		}
-		fmt.Printf("rev: %d\n", resp.Header.Revision)
 		for _, ev := range resp.Events {
 			fmt.Printf("[%d] %s %q : %q\n", ev.Kv.ModRevision, ev.Type, ev.Kv.Key, ev.Kv.Value)
+			doSomething(ev)
 			err := saveRev(ev.Kv.ModRevision)
 			if err != nil {
 				log.Fatal(err)
@@ -87,4 +87,7 @@ func main() {
 		}
 	}
 	//#@@range_end(watch_file)
+}
+
+func doSomething(ev *clientv3.Event) {
 }
