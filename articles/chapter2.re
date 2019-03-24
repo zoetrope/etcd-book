@@ -433,14 +433,14 @@ etcdは、複数のプログラム間で情報を共有する目的で使われ�
 第2引数で監視対象のキーを指定し、第3引数以降でオプションを指定します。
 ここでは@<code>{clientv3.WithPrefix()}オプションを指定してるため、@<code>{"/chapter2/watch/"}から始まるすべてのキーを監視対象としています。
 
-//list{
+//list[][]{
 ch := client.Watch(context.TODO(), "/chapter2/watch/", clientv3.WithPrefix())
 //}
 
 @<code>{Watch}はGo言語のchannelを返します。
 for文でループを回せば、channelがクローズされるまで通知を受け続けることになります。
 
-//list{
+//list[][]{
 for resp := range ch {
     ・・・
 }
@@ -450,7 +450,7 @@ for resp := range ch {
 etcdとの接続が切れた場合や、監視対象のキーがコンパクションで削除された場合は
 @<code>{Err()}を呼び出してエラーチェックをしましょう。
 
-//list{
+//list[][]{
 if resp.Err() != nil {
     log.Fatal(resp.Err())
 }
@@ -460,7 +460,7 @@ if resp.Err() != nil {
 イベントのタイプには"PUT"または"DELETE"が入っています。
 さらに@<code>{IsCreate()}と@<code>{IsModify()}を利用することで、そのキーが新たに作成されたのか変更されたのかを判断することが可能です。
 
-//list{
+//list[][]{
 for _, ev := range resp.Events {
     switch ev.Type {
     case clientv3.EventTypePut:
