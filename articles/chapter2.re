@@ -401,6 +401,11 @@ $ sudo tc qdisc del dev $VETH root
 
 == Watch
 
+etcdは、複数のプログラム間で情報を共有する目的で使われることがよくあります。
+このとき、他のプログラムが情報を更新したことを定期的にチェックしていたのでは効率が悪くなってしまいます。
+そこでetcdでは、キー・バリューの変更を通知するためにWatch APIを提供しています。
+さっそく、Watch APIの使い方を見てみましょう。
+
 //listnum[watch][変更の監視]{
 #@maprange(../code/chapter2/watch/watch.go,watch)
     ch := client.Watch(context.TODO(), "/chapter2/watch/", clientv3.WithPrefix())
@@ -425,40 +430,135 @@ $ sudo tc qdisc del dev $VETH root
 #@end
 //}
 
-Errを返すケース
-* クライアントをCloseするなど監視を終了した場合
-* Compactionされた場合
+第2引数で監視対象のキーを指定し、第3引数以降でオプションを指定します。
+ここでは@<code>{clientv3.WithPrefix()}オプションを指定してるため、@<code>{"/chapter2/watch/"}から始まるすべてのキーを監視対象としています。
 
+//list{
+ch := client.Watch(context.TODO(), "/chapter2/watch/", clientv3.WithPrefix())
+//}
 
-//listnum[watch_rev][変更の監視]{
-#@maprange(../code/chapter2/watch_rev/watch_rev.go,watch_rev)
-    resp, err := client.Get(context.TODO(), "/chapter2/watch_rev")
-    if err != nil || resp.Count == 0 {
-        log.Fatal(err)
+@<code>{Watch}はGo言語のchannelを返します。
+for文でループを回せば、channelがクローズされるまで通知を受け続けることになります。
+
+//list{
+for resp := range ch {
+    ・・・
+}
+//}
+
+通知は@<code>{WatchResponse}型の変数として受け取ります。
+etcdとの接続が切れた場合や、監視対象のキーがコンパクションで削除された場合は
+@<code>{Err()}を呼び出してエラーチェックをしましょう。
+
+//list{
+if resp.Err() != nil {
+    log.Fatal(resp.Err())
+}
+//}
+
+一つの@<code>{WatchResponse}には複数のイベントが含まれているので、ループを回して処理をおこないます。
+イベントのタイプには"PUT"または"DELETE"が入っています。
+さらに@<code>{IsCreate()}と@<code>{IsModify()}を利用することで、そのキーが新たに作成されたのか変更されたのかを判断することが可能です。
+
+//list{
+for _, ev := range resp.Events {
+    switch ev.Type {
+    case clientv3.EventTypePut:
+        switch {
+        case ev.IsCreate():
+            fmt.Printf("CREATE %q : %q\n", ev.Kv.Key, ev.Kv.Value)
+        case ev.IsModify():
+            fmt.Printf("MODIFY %q : %q\n", ev.Kv.Key, ev.Kv.Value)
+        }
+    case clientv3.EventTypeDelete:
+        fmt.Printf("DELETE %q : %q\n", ev.Kv.Key, ev.Kv.Value)
     }
-    fmt.Printf("processed: %s\n", resp.Kvs[0].Value)
-    rev := resp.Kvs[0].ModRevision
-    time.Sleep(300 * time.Millisecond)
-    ch := client.Watch(context.TODO(), "/chapter2/watch_rev", clientv3.WithRev(rev+1))
+}
+//}
+
+さて、変更のおこなわれたキーがどのように変化したのかを知りたい場合もあるでしょう。
+変更前の状態を取得するためには、Watchのオプションに@<code>{clientv3.WithPrevKV()}を指定します。
+すると@<code>{ev.PrevKv}を利用して、変更前の値を取得することができます。
+
+=== 取りこぼしを防ぐ
+
+
+Watch APIを呼び出すと、呼び出した時点からの変更が通知されることになります。
+
+Getで処理をしてからWatchを呼び出すまでの間にもし値が変更されていたら、その変更を取りこぼすことになってしまいます。
+データを取りこぼさないようにWithRevを利用する。
+
+最後に読み取ったrevの値をファイルなどに書き出しておいてもよいでしょう。
+プログラムを一旦停止して、前回の続きから処理を再開したいケースもある
+
+//listnum[saverev][リビジョンの保存]{
+#@maprange(../code/chapter2/watch_file/watch_file.go,save)
+func saveRev(rev int64) error {
+    p := "./last_revision"
+    f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_SYNC, 0644)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+    _, err = f.WriteString(strconv.FormatInt(rev, 10))
+    return err
+}
+
+#@end
+//}
+
+//listnum[loadrev][リビジョンの読み取り]{
+#@maprange(../code/chapter2/watch_file/watch_file.go,load)
+func loadRev() int64 {
+    p := "./last_revision"
+    f, err := os.Open(p)
+    if err != nil {
+        os.Remove(p)
+        return 0
+    }
+    defer f.Close()
+    data, err := ioutil.ReadAll(f)
+    if err != nil {
+        os.Remove(p)
+        return 0
+    }
+    rev, err := strconv.ParseInt(string(data), 10, 64)
+    if err != nil {
+        os.Remove(p)
+        return 0
+    }
+    return rev
+}
+
+#@end
+//}
+
+//listnum[watchfile][]{
+#@maprange(../code/chapter2/watch_file/watch_file.go,watch_file)
+    rev := loadRev()
+    fmt.Printf("loaded revision: %d\n", rev)
+    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
     for resp := range ch {
         if resp.Err() != nil {
             log.Fatal(resp.Err())
         }
+        fmt.Printf("rev: %d\n", resp.Header.Revision)
         for _, ev := range resp.Events {
-            fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+            fmt.Printf("[%d] %s %q : %q\n", ev.Kv.ModRevision, ev.Type, ev.Kv.Key, ev.Kv.Value)
+            err := saveRev(ev.Kv.ModRevision)
+            if err != nil {
+                log.Fatal(err)
+            }
         }
     }
 #@end
 //}
-まずGetで値を取ってきて処理。その後にwatchを開始。
-Watchを呼び出すと、呼び出した時点からの変更が通知されることになります。
-Getで処理をしてからWatchを呼び出すまでの間にもし値が変更されていたら、その変更を取りこぼすことになってしまいます。
-データを取りこぼさないようにWithRevを利用する。
-最後に読み取ったrevの値をファイルなどに書き出しておいてもよいでしょう。
 
-プログラムを一旦停止して、前回の続きから処理を再開したいケースもある
+ただし、この仕組みの場合、イベントの取りこぼしを防ぐことはできますが、同じイベントを重複して実行してしまう可能性は
 
-revを指定してWatchを開始しした場合、その値はすでにコンパクションされている可能性もあります。
+revを指定してWatchを開始しした場合、そのキーはすでにコンパクションされている可能性もあります。
+@<code>{WatchResponse}の@<code>{CompactRevision}を利用すると、コンパクションされていない中で最も古いリビジョンが取得できるので、
+このリビジョンを使って再度Watchを再開するなどの処理をおこなうことになるでしょう。
 
 == Lease
 
@@ -534,4 +634,3 @@ $ ./lease
         log.Fatal(err)
     }
 //}
-
