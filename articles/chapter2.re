@@ -518,14 +518,14 @@ Watch APIを呼び出すときに@<code>{clientv3.WithRev()}オプションを�
 ファイルから前回のリビジョンを読み込み、それをWatchのオプションとして@<code>{clientv3.WithRev()}で指定します。
 ファイルに書き込まれているのは最後に処理したイベントのリビジョン番号なので、次のイベントから通知を開始するために+1した値を指定しています。
 
-//list{
+//list[][]{
 rev := loadRev()
 ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
 //}
 
 通知を受け取ったら、そのイベントを使ってなんらかの処理をおこない、そのときのリビジョン番号をファイルに保存します。
 
-//list{
+//list[][]{
 fmt.Printf("[%d] %s %q : %q\n", ev.Kv.ModRevision, ev.Type, ev.Kv.Key, ev.Kv.Value)
 doSomething(ev)
 err := saveRev(ev.Kv.ModRevision)
@@ -593,11 +593,12 @@ func saveRev(rev int64) error {
 @<code>{WatchResponse}の@<code>{CompactRevision}を利用すると、コンパクションされていない中で最も古いリビジョンが取得できるので、
 このリビジョンを使ってWatchを再開するなどの処理をおこないます。
 
-//listnum[watch_compact][リビジョンの保存]{
+//listnum[watch_compact][Watchのリトライ]{
 #@maprange(../code/chapter2/watch_compact/watch_compact.go,watch_compact)
 RETRY:
     fmt.Printf("watch from rev: %d\n", rev)
-    ch := client.Watch(context.TODO(), "/chapter2/watch_compact", clientv3.WithRev(rev))
+    ch := client.Watch(context.TODO(),
+        "/chapter2/watch_compact", clientv3.WithRev(rev))
     for resp := range ch {
         if resp.Err() == rpctypes.ErrCompacted {
             rev = resp.CompactRevision
@@ -614,10 +615,13 @@ RETRY:
 
 == Lease
 
-何に使えるか。
-一時的にログを蓄えておきたい(Kubernetesのkube-apiserverの--event-ttlとか)
-セッション情報とか
-後述するMutexやLeader Electionでも使ってる。
+etcdではLeaseという仕組みを利用して、キー・バリューに有効期限を指定することができます。
+キーの登録時に有効期限を指定しておくと、その期限が過ぎたときに対象のキーは自動的に削除されます。
+
+KubernetesではこのLease機能を利用してクラスタ内で発生したイベント情報を一時的に蓄えています。
+またセッション情報を管理するために利用することも可能ですし、後述するMutexやLeader Electionでも利用されています。
+
+ではLease機能の利用方法を見ていきましょう。
 
 //listnum[lease][キーの有効期限を設定]{
 #@maprange(../code/chapter2/lease/lease.go,lease)
@@ -647,6 +651,17 @@ RETRY:
 #@end
 //}
 
+Lease機能を利用するためには、まずGrantを呼び出してLeaseを作成します。このとき有効期限を秒単位で指定します。
+
+//list[][]{
+lease, err := client.Grant(context.TODO(), 5)
+//}
+
+そして、キー・バリューを書き込むときに@<code>{clientv3.WithLease()}オプションを指定します。
+
+さて、このコードを実行してみましょう。
+最初の5秒間は値が正しく取得できていますが、5秒後に値が取得できなくなったことがわかります。
+
 //terminal{
 $ ./lease                   
 [21:40:59] value
@@ -658,31 +673,37 @@ $ ./lease
 '/chapter2/lease' disappeared
 //}
 
-//listnum[][リースの期限を延長する]{
-    kaoResp, err = client.KeepAliveOnce(context.TODO(), grantResp.ID)
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Println(kao.TTL)
+有効期限を設定したキー・バリューでも、@<code>{KeepAliveOnce()}を呼び出すことでその有効期限を延長することができます。
+@<code>{KeepAliveOnce()}の引数には、先ほど作成したleaseのIDを渡します。
+
+//list[][リースの期限を延長する]{
+resp, err = client.KeepAliveOnce(context.TODO(), lease.ID)
+if err != nil {
+    log.Fatal(err)
+}
 //}
 
-リースの期間を延長し続けるなんて、リースの意味がなくなってしまうのではと思うかもしれません。
-しかし、KeepAliveを呼び出したプログラムが終了すると、リースの期限は延長されなくなり、いずれそのキーは消えてしまいます。
+@<code>{KeepAliveOnce()}を呼び出すと、有効期限が最初に指定した時間分だけ延長されます。
+@<code>{KeepAliveOnce()}を周期的に呼び出すための仕組みとして、@<code>{KeepAlive()}があります。
+
+//list[][リースの期限を延長し続ける]{
+_, err = client.KeepAlive(context.TODO(), lease.ID)
+if err != nil {
+    log.Fatal(err)
+}
+//}
+
+リースの期間を延長し続けるなんて、リースの意味がなくなってしまうのでは？と思うかもしれません。
+しかし、この@<code>{KeepAlive()}は@<code>{KeepAliveOnce()}を周期的に呼び出しているだけです。
+そのためプログラムが終了するとリースの期限は延長されなくなり、いずれそのキーは消えてしまいます。
 この機能を利用することでプログラムの生存をチェックすることが可能になります。
-これをうまく利用したのがリーダー選出の機能です。後ほど紹介します。
 
-//listnum[][リースの期限を延長し続ける]{
-    _, err = client.KeepAlive(context.TODO(), grantResp.ID)
-    if err != nil {
-        log.Fatal(err)
-    }
-//}
+また、指定した期限までまだ時間がある場合でも、そのキーを失効させたい場合があります。
+その場合は、@<code>{Revoke()}を利用します。
 
-指定した期限までまだ時間がある場合でも、そのキーを失効させたい場合があります。
-
-//listnum[][リースを失効させる]{
-    _, err = client.Revoke(context.TODO(), grantResp.ID)
-    if err != nil {
-        log.Fatal(err)
-    }
+//list[][リースを失効させる]{
+_, err = client.Revoke(context.TODO(), lease.ID)
+if err != nil {
+    log.Fatal(err)
+}
 //}

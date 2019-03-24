@@ -50,7 +50,8 @@ func main() {
 	//#@@range_begin(watch_compact)
 RETRY:
 	fmt.Printf("watch from rev: %d\n", rev)
-	ch := client.Watch(context.TODO(), "/chapter2/watch_compact", clientv3.WithRev(rev))
+	ch := client.Watch(context.TODO(),
+		"/chapter2/watch_compact", clientv3.WithRev(rev))
 	for resp := range ch {
 		if resp.Err() == rpctypes.ErrCompacted {
 			rev = resp.CompactRevision
