@@ -12,7 +12,7 @@ import (
 
 // CA Keys in Vault
 const (
-	CAServer     = "ca-etcd-server"
+	CAEtcdServer = "ca-etcd-server"
 	CAEtcdPeer   = "ca-etcd-peer"
 	CAEtcdClient = "ca-etcd-client"
 )
@@ -34,12 +34,9 @@ func addRole(client *vault.Client, ca, role string, data map[string]interface{})
 	return err
 }
 
-// EtcdCA is a certificate authority for etcd cluster.
-type EtcdCA struct{}
-
 // IssueServerCert issues TLS server certificates.
-func (e EtcdCA) IssueServerCert(ctx context.Context, client *vault.Client, hostname, address string) (crt, key string, err error) {
-	return issueCertificate(client, CAServer, "system",
+func IssueServerCert(ctx context.Context, client *vault.Client, hostname, address string) (crt, key string, err error) {
+	return issueCertificate(client, CAEtcdServer, "system",
 		map[string]interface{}{
 			"ttl":            "87600h",
 			"max_ttl":        "87600h",
@@ -54,7 +51,7 @@ func (e EtcdCA) IssueServerCert(ctx context.Context, client *vault.Client, hostn
 }
 
 // IssuePeerCert issues TLS certificates for mutual peer authentication.
-func (e EtcdCA) IssuePeerCert(ctx context.Context, client *vault.Client, hostname, address string) (crt, key string, err error) {
+func IssuePeerCert(ctx context.Context, client *vault.Client, hostname, address string) (crt, key string, err error) {
 	return issueCertificate(client, CAEtcdPeer, "system",
 		map[string]interface{}{
 			"ttl":            "87600h",
@@ -69,7 +66,7 @@ func (e EtcdCA) IssuePeerCert(ctx context.Context, client *vault.Client, hostnam
 }
 
 // IssueRoot issues certificate for root user.
-func (e EtcdCA) IssueRoot(ctx context.Context, client *vault.Client) (cert, key string, err error) {
+func IssueRootCert(ctx context.Context, client *vault.Client) (cert, key string, err error) {
 	return issueCertificate(client, CAEtcdClient, "admin",
 		map[string]interface{}{
 			"ttl":            "2h",
@@ -85,7 +82,7 @@ func (e EtcdCA) IssueRoot(ctx context.Context, client *vault.Client) (cert, key 
 }
 
 // IssueEtcdClientCertificate issues TLS client certificate for a target role.
-func IssueEtcdClientCertificate(client *vault.Client, role, commonName, ttl string) (cert, key string, err error) {
+func IssueEtcdClientCert(client *vault.Client, role, commonName, ttl string) (cert, key string, err error) {
 	return issueCertificate(client, CAEtcdClient, role,
 		map[string]interface{}{
 			"ttl":            "87600h",
@@ -115,15 +112,42 @@ func issueCertificate(client *vault.Client, ca, role string, roleOpts, certOpts 
 	return crt, key, err
 }
 
-func createCA(client *vault.Client, ca string) error {
-	// $VAULT secrets enable -path ${common_name} -max-lease-ttl=876000h -default-lease-ttl=87600h pki
-	// s=$($VAULT write -format=json ${common_name}/root/generate/internal common_name=${common_name} ttl=876000h format=pem)
-	// echo ${s} | jq -r .data.certificate > /tmp/${common_name}
+func createCA(client *vault.Client, ca string) (string, error) {
+	secret, err := client.Logical().Read(ca + "/cert/ca")
+	if err != nil {
+		return "", err
+	}
+	if secret == nil {
+		p := ca + "/root/generate/internal"
+		secret, err = client.Logical().Write(p, map[string]interface{}{
+			"common_name": ca,
+			"ttl":         "876000h",
+			"format":      "pem",
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+	cert := secret.Data["certificate"]
+	return cert.(string), nil
+}
 
-	mountPath := ca
-	mountPath = strings.TrimSpace(mountPath)
-	for len(mountPath) > 0 && mountPath[len(mountPath)-1] != '/' {
-		mountPath = mountPath + "/"
+func trailingSlash(p string) string {
+	p = strings.TrimSpace(p)
+	for len(p) > 0 && p[len(p)-1] != '/' {
+		p = p + "/"
+	}
+	return p
+}
+
+func enableSecrets(client *vault.Client, ca string) error {
+	mounts, err := client.Sys().ListMounts()
+	if err != nil {
+		return err
+	}
+	mountPath := trailingSlash(ca)
+	if _, ok := mounts[mountPath]; ok {
+		return nil
 	}
 	mountInput := &vault.MountInput{
 		Type: "pki",
@@ -132,31 +156,35 @@ func createCA(client *vault.Client, ca string) error {
 			MaxLeaseTTL:     "876000h",
 		},
 	}
-	err := client.Sys().Mount(mountPath, mountInput)
-	if err != nil {
-		return err
-	}
-
-	secret, err := client.Logical().Write(ca+"/root/generate/internal", map[string]interface{}{
-		"common_name": ca,
-		"ttl":         "876000h",
-		"format":      "pem",
-	})
-	if err != nil {
-		return err
-	}
-
-	cert := secret.Data["certificate"]
-	fmt.Println(cert)
-
-	return nil
+	return client.Sys().Mount(mountPath, mountInput)
 }
+
 func main() {
 	client, err := vault.NewClient(&vault.Config{
 		Address: "http://127.0.0.1:8200",
 	})
+	client.SetToken("myroot")
 	if err != nil {
 		log.Fatal(err)
 	}
-	createCA(client)
+	for _, ca := range []string{CAEtcdServer, CAEtcdPeer, CAEtcdClient} {
+		err = enableSecrets(client, ca)
+		if err != nil {
+			log.Fatal(err)
+		}
+		cert, err := createCA(client, ca)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(cert)
+	}
+
+	c, k, err := IssueServerCert(context.TODO(), client, "etcd", "192.168.0.1")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("------------------------------------")
+	fmt.Println(c)
+	fmt.Println("------------------------------------")
+	fmt.Println(k)
 }
