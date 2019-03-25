@@ -1,3 +1,4 @@
 *.pdf
 etcdctl
 go.sum
+node_modules/*
