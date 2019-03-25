@@ -7,6 +7,9 @@ pdf:
 preproc:
 	docker run --rm -v `pwd`/:/work -u $(shell id -u):$(shell id -g) kauplan/review2.5 /bin/sh -c "cd /work/articles; rake preproc"
 
+lint:
+	npm run textlint
+
 start-etcd:
 	docker run --name etcd \
 		-p 2379:2379 \
