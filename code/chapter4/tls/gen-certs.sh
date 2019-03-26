@@ -1,28 +1,15 @@
 #!/bin/bash -e
 
-VAULT="docker exec -e VAULT_TOKEN=myroot -e VAULT_ADDR=http://127.0.0.1:8200 dev-vault vault"
+mkdir -p certs
 
-function create_ca(){
-  common_name=$1
-  $VAULT secrets enable -path ${common_name} -max-lease-ttl=876000h -default-lease-ttl=87600h pki
-  s=$($VAULT write -format=json ${common_name}/root/generate/internal common_name=${common_name} ttl=876000h format=pem)
-  echo ${s} | jq -r .data.certificate > /tmp/${common_name}
-}
-
-# docker run --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=myroot' -d --name=dev-vault vault:latest
-
-# generate ca
-#create_ca "ca-etcd-server"
-#create_ca "ca-etcd-peer"
-#create_ca "ca-etcd-client"
-create_ca "hogehoge3"
+# generate CA
+cfssl gencert -initca ca-csr.json | cfssljson -bare certs/ca -
 
 # generate server certificate
-$VAULT write -format=json ca-etcd-server/issue/system
+cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=server server.json | cfssljson -bare certs/server
 
-# vault secrets enable -path "etcd-ca" -max-lease-ttl=876000h -default-lease-ttl=87600h pki
-# s=$(vault write -format=json etcd-ca/root/generate/internal common_name=etcd-ca ttl=876000h format=pem)
-# echo ${s} | jq -r .data.certificate > ./etcd-ca
+cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=peer etcd1.json | cfssljson -bare certs/etcd1
+cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=peer etcd2.json | cfssljson -bare certs/etcd2
+cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=peer etcd3.json | cfssljson -bare certs/etcd3
 
-# docker stop dev-vault
-# docker rm dev-vault
+cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=client client.json | cfssljson -bare certs/client

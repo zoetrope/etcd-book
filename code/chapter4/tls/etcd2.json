@@ -1,0 +1,18 @@
+{
+    "CN": "etcd2",
+    "hosts": [
+        "172.30.0.12",
+        "etcd2"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": [
+        {
+            "C": "JP",
+            "L": "Tokyo",
+            "ST": "Chuo-ku"
+        }
+    ]
+}
