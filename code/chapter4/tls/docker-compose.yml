@@ -1,3 +1,4 @@
+#@range_begin(etcd1)
 version: '3'
 services:
   etcd1:
@@ -30,6 +31,7 @@ services:
       - --peer-key-file=/certs/etcd1-key.pem
       - --peer-client-cert-auth=true
       - --peer-trusted-ca-file=/certs/ca.pem
+#@range_end(etcd1)
   etcd2:
     container_name: etcd2
     image: quay.io/coreos/etcd:v3.3.12
@@ -90,6 +92,7 @@ services:
       - --peer-key-file=/certs/etcd3-key.pem
       - --peer-client-cert-auth=true
       - --peer-trusted-ca-file=/certs/ca.pem
+#@range_begin(networks)
 networks:
   app_net:
     driver: bridge
@@ -101,3 +104,4 @@ volumes:
   etcd1-data:
   etcd2-data:
   etcd3-data:
+#@range_end(networks)
