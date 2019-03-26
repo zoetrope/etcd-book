@@ -8,7 +8,7 @@ services:
       app_net:
         ipv4_address: 172.30.0.11
     ports:
-      - 23791:2379
+      - 2379
       - 2380
     volumes:
       - etcd1-data:/etcd-data
@@ -23,6 +23,7 @@ services:
       - --listen-client-urls=https://0.0.0.0:2379
       - "--initial-cluster=etcd1=https://etcd1:2380,\
            etcd2=https://etcd2:2380,etcd3=https://etcd3:2380"
+      - --initial-cluster-state=new
       - --cert-file=/certs/server.pem
       - --key-file=/certs/server-key.pem
       - --client-cert-auth=true
@@ -39,7 +40,7 @@ services:
       app_net:
         ipv4_address: 172.30.0.12
     ports:
-      - 23792:2379
+      - 2379
       - 2380
     volumes:
       - etcd2-data:/etcd-data
@@ -54,6 +55,7 @@ services:
       - --listen-client-urls=https://0.0.0.0:2379
       - "--initial-cluster=etcd1=https://etcd1:2380,\
           etcd2=https://etcd2:2380,etcd3=https://etcd3:2380"
+      - --initial-cluster-state=new
       - --cert-file=/certs/server.pem
       - --key-file=/certs/server-key.pem
       - --client-cert-auth=true
@@ -69,7 +71,7 @@ services:
       app_net:
         ipv4_address: 172.30.0.13
     ports:
-      - 23793:2379
+      - 2379
       - 2380
     volumes:
       - etcd3-data:/etcd-data
@@ -84,6 +86,7 @@ services:
       - --listen-client-urls=https://0.0.0.0:2379
       - "--initial-cluster=etcd1=https://etcd1:2380,\
           etcd2=https://etcd2:2380,etcd3=https://etcd3:2380"
+      - --initial-cluster-state=new
       - --cert-file=/certs/server.pem
       - --key-file=/certs/server-key.pem
       - --client-cert-auth=true

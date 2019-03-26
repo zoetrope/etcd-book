@@ -1,39 +1,10 @@
 = etcdの運用
 
-== etcdの起動
-
-//cmd{
-$ docker run \
-    -p 2379:2379 \
-    -p 2380:2380 \
-    --volume=etcd-data:/etcd-data \
-    --name etcd quay.io/coreos/etcd:v3.3.12 \
-    /usr/local/bin/etcd \
-      --data-dir=/etcd-data --name node1 \
-      --initial-advertise-peer-urls http://${NODE1}:2380 --listen-peer-urls http://${NODE1}:2380 \
-      --advertise-client-urls http://${NODE1}:2379 --listen-client-urls http://${NODE1}:2379 \
-      --initial-cluster node1=http://${NODE1}:2380
-//}
-
-: -p 2379:2379
-    コンテナ外からetcdのAPIを呼び出せるように2379番ポートをホストにバインドしています。
-: -v etcd-data:/var/lib/etcd
-    etcd-dataというボリュームを作成し、コンテナの@<code>{/var/lib/etcd}にバインドしています。これによりコンテナを終了してもetcdのデータは
-消えません。
-
-etcdに以下の起動オプションを指定します。
-
-: --listen-client-urls
-    etcdがクライアントからのリクエストを受け付けるURLを指定します。
-: --advertise-client-urls
-    クライアント用のURLをクラスタの他のメンバーに伝えるために指定します。
-    現在はクラスタを組んでいませんが、@<code>{--listen-client-urls}を指定した場合は必ずこのオプションも指定する必要があります。
-
 
 == クラスタの構築
 
-//listnum[compose][docker-compose.yml]{
-#@mapfile(../code/chapter4/docker-compose.yml)
+//list[compose][docker-compose.yml]{
+#@mapfile(../code/chapter4/cluster/docker-compose.yml)
 version: '3'
 services:
   etcd1:
@@ -54,6 +25,7 @@ services:
       - --listen-client-urls=http://0.0.0.0:2379
       - "--initial-cluster=etcd1=http://etcd1:2380,\
            etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
+      - --initial-cluster-state=new
   etcd2:
     container_name: etcd2
     image: quay.io/coreos/etcd:v3.3.12
@@ -72,6 +44,7 @@ services:
       - --listen-client-urls=http://0.0.0.0:2379
       - "--initial-cluster=etcd1=http://etcd1:2380,\
           etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
+      - --initial-cluster-state=new
   etcd3:
     container_name: etcd3
     image: quay.io/coreos/etcd:v3.3.12
@@ -90,6 +63,7 @@ services:
       - --listen-client-urls=http://0.0.0.0:2379
       - "--initial-cluster=etcd1=http://etcd1:2380,\
           etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
+      - --initial-cluster-state=new
 volumes:
   etcd1-data:
   etcd2-data:
@@ -97,6 +71,9 @@ volumes:
 #@end
 //}
 
+//terminal{
+$ docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' etcd1
+//}
 
 //terminal{
 $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd1 etcdctl --endpoints=http://etcd1:2379,http://etcd2:2379,http://etcd3:2379'
@@ -113,10 +90,10 @@ $ go get -u github.com/cloudflare/cfssl/cmd/cfssl
 $ go get -u github.com/cloudflare/cfssl/cmd/cfssljson
 //}
 
-まずはCA用のCSR(証明書署名要求)を生成するための設定ファイルを作成します。
+まずCSR(証明書署名要求)の設定ファイルを作成します。
 このファイルには、公開鍵の暗号化方式や組織の所在地などを含めます。
 
-//listnum[ca-csr][ca-csr.json]{
+//list[ca-csr][ca-csr.json]{
 #@mapfile(../code/chapter4/tls/ca-csr.json)
 {
     "CN": "test.local",
@@ -135,7 +112,7 @@ $ go get -u github.com/cloudflare/cfssl/cmd/cfssljson
 #@end
 //}
 
-この設定ファイルを使用してCA
+この設定ファイルを使用して自己署名ルートCA証明書と秘密鍵を生成します。
 
 //list[][]{
 #@maprange(../code/chapter4/tls/gen-certs.sh,ca)
@@ -145,7 +122,7 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare certs/ca
 
 次にCAの設定を記述します。
 
-//listnum[ca-config][ca-config.json]{
+//list[ca-config][ca-config.json]{
 #@mapfile(../code/chapter4/tls/ca-config.json)
 {
     "signing": {
@@ -184,7 +161,7 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare certs/ca
 #@end
 //}
 
-//listnum[server][server.json]{
+//list[server][server.json]{
 #@mapfile(../code/chapter4/tls/server.json)
 {
     "CN": "etcd",
@@ -217,7 +194,7 @@ cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -
 #@end
 //}
 
-//listnum[etcd1][etcd1.json]{
+//list[etcd1][etcd1.json]{
 #@mapfile(../code/chapter4/tls/etcd1.json)
 {
     "CN": "etcd1",
@@ -246,7 +223,7 @@ cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -
 #@end
 //}
 
-//listnum[client][client.json]{
+//list[client][client.json]{
 #@mapfile(../code/chapter4/tls/client.json)
 {
     "CN": "client",
@@ -272,7 +249,7 @@ cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -
 #@end
 //}
 
-//listnum[docker-compose][docker-compose.yml]{
+//list[docker-compose][docker-compose.yml]{
 #@maprange(../code/chapter4/tls/docker-compose.yml,etcd1)
 version: '3'
 services:
@@ -283,7 +260,7 @@ services:
       app_net:
         ipv4_address: 172.30.0.11
     ports:
-      - 23791:2379
+      - 2379
       - 2380
     volumes:
       - etcd1-data:/etcd-data
@@ -298,6 +275,7 @@ services:
       - --listen-client-urls=https://0.0.0.0:2379
       - "--initial-cluster=etcd1=https://etcd1:2380,\
            etcd2=https://etcd2:2380,etcd3=https://etcd3:2380"
+      - --initial-cluster-state=new
       - --cert-file=/certs/server.pem
       - --key-file=/certs/server-key.pem
       - --client-cert-auth=true

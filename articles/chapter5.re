@@ -47,7 +47,7 @@ $ helm install --name prometheus --namespace monitoring stable/prometheus
 $ helm inspect values stable/grafana > grafana-values.yml
 //}
 
-//listnum[grafana-values][grafana-values.ymlの書き換え]{
+//list[grafana-values][grafana-values.ymlの書き換え]{
 --- grafana-values.yaml.org     2019-03-10 15:05:41.765498204 +0900
 +++ grafana-values.yaml 2019-03-10 15:04:41.303469189 +0900
 @@ -72,7 +72,7 @@
@@ -87,7 +87,7 @@ https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubern
 
 また、
 
-//listnum[etcd-cluster][etcd-cluster.yml]{
+//list[etcd-cluster][etcd-cluster.yml]{
 #@mapfile(../code/chapter5/prometheus/etcd-cluster.yml)
 apiVersion: "etcd.database.coreos.com/v1beta2"
 kind: "EtcdCluster"

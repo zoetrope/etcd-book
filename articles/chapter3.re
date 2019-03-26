@@ -10,7 +10,7 @@ etcdにアクセスするクライアントが常に1つしか存在しないの
 このようなとき、正しくデータの読み書きをおこなわないと、データの不整合が発生する可能性があります。
 例えば、以下のような例をみてみましょう。
 
-//listnum[conflict][コンフリクトの例]{
+//list[conflict][コンフリクトの例]{
 #@maprange(../code/chapter3/conflict/conflict.go,conflict)
     addValue := func(d int) {
         resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
@@ -36,7 +36,7 @@ etcdにアクセスするクライアントが常に1つしか存在しないの
 
 Transactionを利用したコードに書き換えてみましょう。
 
-//listnum[txn][Transaction]{
+//list[txn][Transaction]{
 #@maprange(../code/chapter3/transaction/transaction.go,txn)
     addValue := func(d int) {
     RETRY:
@@ -107,7 +107,7 @@ MutexやLeaderElectionで利用する。
 
 === Mutex
 
-//listnum[mutex][ロック]{
+//list[mutex][ロック]{
 #@maprange(../code/chapter3/mutex/mutex.go,lock)
     s, err := concurrency.NewSession(client)
     if err != nil {
@@ -138,7 +138,7 @@ OSが提供するMutexとは異なり
 
 そこで、ロックを取ったあとにetcdのキーバリューの操作をおこなう際には、トランザクションを利用してIf条件に@<code>{Mutex.IsOwner()}を指定しましょう。
 
-//listnum[owner][IsOwner]{
+//list[owner][IsOwner]{
 #@maprange(../code/chapter3/mutex/mutex.go,owner)
 RETRY:
     select {
@@ -175,7 +175,7 @@ RETRY:
 
 先程のトランザクション処理をSTMを使って書き換えてみましょう。
 
-//listnum[stm][STM]{
+//list[stm][STM]{
 #@maprange(../code/chapter3/stm/stm.go,stm)
     addValue := func(d int) {
         _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
@@ -220,7 +220,7 @@ WithAbortContext
  ** 一切トランザクションになっていないので使うべきではない。
  ** ファジーリードも発生しない。一度readした値はキャッシュしているので必ず同じ値を返す。
 
-//listnum[phantom][ファントムリード]{
+//list[phantom][ファントムリード]{
 #@maprange(../code/chapter3/isolation/isolation.go,phantom)
     addValue := func(d int) {
         _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
@@ -256,7 +256,7 @@ WithAbortContext
 
 === Leader Election
 
-//listnum[leader][リーダー選出]{
+//list[leader][リーダー選出]{
 #@maprange(../code/chapter3/leader/leader.go,leader)
     flag.Parse()
     if flag.NArg() != 1 {
@@ -297,7 +297,7 @@ Ctrl+Cを押してリーダーのプロセスを終了させてみてくださ�
 自分がリーダーだと思って行動していたのに実はリーダーではなかったという状況に陥ります。
 そこで、トランザクションのIf条件にリーダーキーが消えていないことを確認する条件をつけましょう。
 
-//listnum[leader_txn][リーダー選出後のトランザクション]{
+//list[leader_txn][リーダー選出後のトランザクション]{
 #@maprange(../code/chapter3/leader_txn/leader_txn.go,txn)
 RETRY:
     select {
@@ -326,7 +326,7 @@ RETRY:
 上述したように、リーダーに選出された後も様々な理由でリーダーではなくなる可能性があります。
 そこで自身がリーダーでなくなったことを検出したくなると思います。
 
-//listnum[leader_watch][リーダーチェック]{
+//list[leader_watch][リーダーチェック]{
 #@maprange(../code/chapter3/leader_watch/leader_watch.go,watch)
 func watchLeader(ctx context.Context, s *concurrency.Session, leaderKey string) error {
     ch := s.Client().Watch(ctx, leaderKey, clientv3.WithFilterPut())

@@ -24,7 +24,7 @@ go version go1.12.1 linux/amd64
 ではetcdにアクセスするプログラムを書いてみましょう。
 以下のようなファイルを作成し、client.goという名前で保存してください。
 
-//listnum[client][クライアントの作成]{
+//list[client][クライアントの作成]{
 #@mapfile(../code/chapter2/client/client.go)
 package main
 
@@ -145,7 +145,7 @@ for _, m := range resp.Members {
 
 @<list>{client}のファイルをコピーし、@<code>{MemberList()}を呼び出す代わりに以下のようなコードを書いてみます。
 
-//listnum[kv-write][データの書き込み]{
+//list[kv-write][データの書き込み]{
 #@maprange(../code/chapter2/kv/kv.go,write)
     _, err = client.Put(context.TODO(), "/chapter2/kv", "my-value")
     if err != nil {
@@ -160,7 +160,7 @@ for _, m := range resp.Members {
 では、書き込んだ値が正しく読み込めるかどうか試してみましょう。
 先程のコードの続きに以下の処理を追加します。
 
-//listnum[kv-read][データの読み込み]{
+//list[kv-read][データの読み込み]{
 #@maprange(../code/chapter2/kv/kv.go,read)
     resp, err := client.Get(context.TODO(), "/chapter2/kv")
     if err != nil {
@@ -178,7 +178,7 @@ for _, m := range resp.Members {
 
 次に書き込んだ値を削除してみましょう。
 
-//listnum[kv-delete][データの削除]{
+//list[kv-delete][データの削除]{
 #@maprange(../code/chapter2/kv/kv.go,delete)
     _, err = client.Delete(context.TODO(), "/chapter2/kv")
     if err != nil {
@@ -194,7 +194,7 @@ for _, m := range resp.Members {
 @<code>{client.Put()}, @<code>{client.Get()}, @<code>{client.Delete()}にはいろいろなオプションを指定することができます。
 ここでは@<code>{client.Get()}を例に上げていくつかのオプションをみてみましょう。
 
-//listnum[opts-read][オプションの指定]{
+//list[opts-read][オプションの指定]{
 #@maprange(../code/chapter2/opts/opts.go,read)
     client.Put(context.TODO(), "/chapter2/option/key3", "val2")
     client.Put(context.TODO(), "/chapter2/option/key1", "val3")
@@ -240,7 +240,7 @@ etcdはMVCC (MultiVersion Concurrency Control)モデルを採用したキーバ�
 
 その前に@<code>{client.Get()}の結果を詳しく表示するヘルパー関数を用意しておきます。
 
-//listnum[mvcc-print][]{
+//list[mvcc-print][]{
 #@maprange(../code/chapter2/revision/revision.go,print)
 func printResponse(resp *clientv3.GetResponse) {
     fmt.Println("header: " + resp.Header.String())
@@ -357,7 +357,7 @@ etcdクライアントは、etcdサーバーとの通信をおこなうため、
 
 それでは@<code>{context}を利用して処理をキャンセルする例をみてみましょう。
 
-//listnum[context][処理のキャンセル]{
+//list[context][処理のキャンセル]{
 #@maprange(../code/chapter2/timeout/timeout.go,timeout)
     ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
     defer cancel()
@@ -406,7 +406,7 @@ etcdは、複数のプログラム間で情報を共有する目的で使われ�
 そこでetcdでは、キー・バリューの変更を通知するためにWatch APIを提供しています。
 さっそく、Watch APIの使い方を見てみましょう。
 
-//listnum[watch][変更の監視]{
+//list[watch][変更の監視]{
 #@maprange(../code/chapter2/watch/watch.go,watch)
     ch := client.Watch(context.TODO(), "/chapter2/watch/", clientv3.WithPrefix())
     for resp := range ch {
@@ -494,7 +494,7 @@ Watch APIを呼び出すときに@<code>{clientv3.WithRev()}オプションを�
 ここではイベントを取りこぼさずに処理する例として、処理の完了したリビジョン番号をファイルに書き出しておき、
 プログラムを再度起動したときにはそのリビジョン番号から処理を再開するような実装を紹介します。
 
-//listnum[watchfile][]{
+//list[watchfile][]{
 #@maprange(../code/chapter2/watch_file/watch_file.go,watch_file)
     rev := loadRev()
     fmt.Printf("loaded revision: %d\n", rev)
@@ -535,7 +535,7 @@ err := saveRev(ev.Kv.ModRevision)
 ファイルが見つからなかった場合や読み取りに失敗した場合は0を返すようにしています。
 @<code>{clientv3.WithRev()}に0を指定した場合は、呼び出した時点からの変更が通知されることになります。
 
-//listnum[loadrev][リビジョンの読み取り]{
+//list[loadrev][リビジョンの読み取り]{
 #@maprange(../code/chapter2/watch_file/watch_file.go,load)
 func loadRev() int64 {
     p := "./last_revision"
@@ -563,7 +563,7 @@ func loadRev() int64 {
 
 リビジョン番号をファイルに書き出す処理は以下のように実装します。
 
-//listnum[saverev][リビジョンの保存]{
+//list[saverev][リビジョンの保存]{
 #@maprange(../code/chapter2/watch_file/watch_file.go,save)
 func saveRev(rev int64) error {
     p := "./last_revision"
@@ -593,7 +593,7 @@ func saveRev(rev int64) error {
 @<code>{WatchResponse}の@<code>{CompactRevision}を利用すると、コンパクションされていない中で最も古いリビジョンが取得できるので、
 このリビジョンを使ってWatchを再開するなどの処理をおこないます。
 
-//listnum[watch_compact][Watchのリトライ]{
+//list[watch_compact][Watchのリトライ]{
 #@maprange(../code/chapter2/watch_compact/watch_compact.go,watch_compact)
 RETRY:
     fmt.Printf("watch from rev: %d\n", rev)
@@ -623,7 +623,7 @@ KubernetesではこのLease機能を利用してクラスタ内で発生した�
 
 ではLease機能の利用方法を見ていきましょう。
 
-//listnum[lease][キーの有効期限を設定]{
+//list[lease][キーの有効期限を設定]{
 #@maprange(../code/chapter2/lease/lease.go,lease)
     lease, err := client.Grant(context.TODO(), 5)
     if err != nil {

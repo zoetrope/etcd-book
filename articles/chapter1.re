@@ -23,6 +23,20 @@ $ docker run --name etcd \
       --listen-client-urls http://0.0.0.0:2379
 //}
 
+: -p 2379:2379
+    コンテナ外からetcdのAPIを呼び出せるように2379番ポートをホストにバインドしています。
+: -v etcd-data:/var/lib/etcd
+    etcd-dataというボリュームを作成し、コンテナの@<code>{/var/lib/etcd}にバインドしています。これによりコンテナを終了してもetcdのデータは
+消えません。
+
+etcdに以下の起動オプションを指定します。
+
+: --listen-client-urls
+    etcdがクライアントからのリクエストを受け付けるURLを指定します。
+: --advertise-client-urls
+    クライアント用のURLをクラスタの他のメンバーに伝えるために指定します。
+    現在はクラスタを組んでいませんが、@<code>{--listen-client-urls}を指定した場合は必ずこのオプションも指定する必要があります。
+
 以下のようなログが出力されればetcdの起動は成功です@<fn>{insecure}。
 
 //footnote[insecure][安全ではないのでおすすめしないというメッセージが表示されています。安全な接続方法については後ほど解説します。]
