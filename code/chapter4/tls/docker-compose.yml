@@ -1,0 +1,107 @@
+#@range_begin(etcd1)
+version: '3'
+services:
+  etcd1:
+    container_name: etcd1
+    image: quay.io/coreos/etcd:v3.3.12
+    networks:
+      app_net:
+        ipv4_address: 172.30.0.11
+    ports:
+      - 23791:2379
+      - 2380
+    volumes:
+      - etcd1-data:/etcd-data
+      - ./certs/:/certs/
+    entrypoint:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd1
+      - --initial-advertise-peer-urls=https://etcd1:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd1:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - "--initial-cluster=etcd1=https://etcd1:2380,\
+           etcd2=https://etcd2:2380,etcd3=https://etcd3:2380"
+      - --cert-file=/certs/server.pem
+      - --key-file=/certs/server-key.pem
+      - --client-cert-auth=true
+      - --trusted-ca-file=/certs/ca.pem
+      - --peer-cert-file=/certs/etcd1.pem
+      - --peer-key-file=/certs/etcd1-key.pem
+      - --peer-client-cert-auth=true
+      - --peer-trusted-ca-file=/certs/ca.pem
+#@range_end(etcd1)
+  etcd2:
+    container_name: etcd2
+    image: quay.io/coreos/etcd:v3.3.12
+    networks:
+      app_net:
+        ipv4_address: 172.30.0.12
+    ports:
+      - 23792:2379
+      - 2380
+    volumes:
+      - etcd2-data:/etcd-data
+      - ./certs/:/certs/
+    entrypoint:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd2
+      - --initial-advertise-peer-urls=https://etcd2:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd2:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - "--initial-cluster=etcd1=https://etcd1:2380,\
+          etcd2=https://etcd2:2380,etcd3=https://etcd3:2380"
+      - --cert-file=/certs/server.pem
+      - --key-file=/certs/server-key.pem
+      - --client-cert-auth=true
+      - --trusted-ca-file=/certs/ca.pem
+      - --peer-cert-file=/certs/etcd2.pem
+      - --peer-key-file=/certs/etcd2-key.pem
+      - --peer-client-cert-auth=true
+      - --peer-trusted-ca-file=/certs/ca.pem
+  etcd3:
+    container_name: etcd3
+    image: quay.io/coreos/etcd:v3.3.12
+    networks:
+      app_net:
+        ipv4_address: 172.30.0.13
+    ports:
+      - 23793:2379
+      - 2380
+    volumes:
+      - etcd3-data:/etcd-data
+      - ./certs/:/certs/
+    entrypoint:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd3
+      - --initial-advertise-peer-urls=https://etcd3:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd3:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - "--initial-cluster=etcd1=https://etcd1:2380,\
+          etcd2=https://etcd2:2380,etcd3=https://etcd3:2380"
+      - --cert-file=/certs/server.pem
+      - --key-file=/certs/server-key.pem
+      - --client-cert-auth=true
+      - --trusted-ca-file=/certs/ca.pem
+      - --peer-cert-file=/certs/etcd3.pem
+      - --peer-key-file=/certs/etcd3-key.pem
+      - --peer-client-cert-auth=true
+      - --peer-trusted-ca-file=/certs/ca.pem
+#@range_begin(networks)
+networks:
+  app_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/24
+volumes:
+  etcd1-data:
+  etcd2-data:
+  etcd3-data:
+#@range_end(networks)

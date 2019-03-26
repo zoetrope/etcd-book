@@ -1,0 +1,18 @@
+{
+    "CN": "etcd3",
+    "hosts": [
+        "172.30.0.13",
+        "etcd3"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": [
+        {
+            "C": "JP",
+            "L": "Tokyo",
+            "ST": "Chuo-ku"
+        }
+    ]
+}
