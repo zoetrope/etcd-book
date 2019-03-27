@@ -303,12 +303,32 @@ volumes:
 
 
 //terminal{
-$ ETCDCTL_API=3 etcdctl --endpoints=https://localhost:23791,https://localhost:23792,https://localhost:23793 --key=./certs/client-key.pem --cert=./certs/client.pem --insecure-skip-tls-verify=true member list 
+$ ETCDCTL_API=3 etcdctl --endpoints=https://172.30.0.11:2379,https://172.30.0.12:2379,https://172.30.0.13:2379 --key=./certs/client-key.pem --cert=./certs/client.pem --insecure-skip-tls-verify=true member list 
 1f6fd35e3327767a, started, etcd1, https://etcd1:2380, https://etcd1:2379
 2a6277f8728ef760, started, etcd3, https://etcd3:2380, https://etcd3:2379
 4acd0a1e9189cd7a, started, etcd2, https://etcd2:2380, https://etcd2:2379
 //}
 
+== メンバーの追加・削除
+
+//terminal{
+$ etcdctl member add etcd4 --peer-urls=http://etcd4:2380
+Member 97754dc05c5b1f8d added to cluster 8f2a2ec5c0087dcb
+
+ETCD_NAME="etcd4"
+ETCD_INITIAL_CLUSTER="etcd4=http://etcd4:2380,etcd1=http://etcd1:2380,etcd3=http://etcd3:2380,etcd2=http://etcd2:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://etcd4:2380"
+ETCD_INITIAL_CLUSTER_STATE="existing"
+//}
+
+
+//terminal{
+$ docker-compose up etcd1 etcd2 etcd3
+//}
+
+//terminal{
+$ docker-compose up etcd4
+//}
 
 == Namespace
 
@@ -317,10 +337,6 @@ $ ETCDCTL_API=3 etcdctl --endpoints=https://localhost:23791,https://localhost:23
 == スナップショット
 
 == コンパクション
-
-== メンバーの追加・削除
-
-メンバーが追加できるようになるまで少し時間がかかるので注意。
 
 == アップグレード
 
