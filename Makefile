@@ -19,7 +19,8 @@ start-etcd:
 			--name=etcd \
 			--data-dir=/etcd-data \
 			--advertise-client-urls http://0.0.0.0:2379 \
-			--listen-client-urls http://0.0.0.0:2379
+			--listen-client-urls http://0.0.0.0:2379 \
+			--enable-pprof=true
 
 destroy:
 	docker stop etcd

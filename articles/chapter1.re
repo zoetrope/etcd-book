@@ -126,6 +126,9 @@ $ etcdctl get / --prefix=true --keys-only
 バリューも内部的にはバイト配列として扱われています。
 1つのバリューのサイズは最大1MBまで格納することができます。
 
+## etcd v3.4では1.5MiBに？これはリクエストサイズなのでバリューサイズではない？
+## https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/dev-guide/limit.md
+
 バリューは単純な文字列として格納してもよいですし、構造的なデータを扱いたいのであれば
 JSONやProtocol Bufferなどでエンコードした形式で格納してもよいでしょう。
 
