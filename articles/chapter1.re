@@ -72,29 +72,74 @@ $ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl --endpoint=http://1
 
 == etcdにデータを読み書きしてみよう
 
+etcdctlを利用してetcdにデータを書き込んでみます。
+ここでは@<code>{/chapter1/hello}というキーに@<code>{Hello, World!}といバリューを書き込んでいます。
+書き込みに成功するとOKと表示されます。
 
+//terminal{
+$ etcdctl put /chapter1/hello 'Hello, World!'
+OK
+//}
 
+次にキーを指定して値を読み込んでみましょう。
+@<code>{/chapter1/hello}というキーを指定してgetコマンドを実行すると、先程書き込んだバリューが表示されます。
 
-=== キースペース
+//terminal{
+$ etcdctl get /chapter1/hello            
+/chapter1/hello
+Hello, World!
+//}
 
-etcd v2では、キーをファイルシステムのように/で区切って階層的に管理していました。
-etcd v3では、キーを単一のバイト配列としてフラットなキースペースで管理するように変わりました。
-例えばキーの名前に/this/is/a/keyだったとしても、キーはただのバイト配列として扱われます。
+=== キー
 
-etcd v2のときは、特定の階層に対してアクセス権を設定したり、値をウォッチすることができました。
-etcd v3では、特定のプレフィックスで始まるキーに対してアクセス権を設定したり、値をウォッチすることができます。
+先程の例でetcdにデータを書き込むときに@<code>{/chapter1/hello}というキーを利用しました。
+このキーの名前はどのように決めればいいのでしょうか？
+etcd v3ではキーは内部的にはバイト配列として扱われており、どのような文字列でも利用することができます。
+日本語を利用することも可能です。
 
-namepaceや、アクセス権の
+//note[キースペースの変更]{
+etcd v2とv3ではキーの管理方法が大きく変わりました。
+etcd v2ではキーをファイルシステムのように/で区切って階層的に管理していました。
+etcd v3からはキーを単一のバイト配列としてフラットなキースペースで管理するように。
+//}
 
-しかし、慣例的に/で区切って管理することが多くなっています。
+etcdには、MySQLやPostgreSQLにあるようなデータベースやテーブルのような概念はありません。
+そのため複数のアプリケーションで1つのetcdクラスタを共有する場合は、アプリケーションごとにキーのプレフィックスを決めておくことが一般的です。
+例えばアプリケーション1は@<code>{/app1/}から始まるキー、アプリケーション2は@<code>{/app2/}から始まるキーを使うというような決まりにします。
+etcdではキーのプレフィックスに対してアクセス権を設定することができるので、@<code>{/app1/}から始まるキーはアプリケーション1の実行ユーザーのみが
+読み書き可能な設定にしておきます。
 
+具体的にKubernetesの例を見てみましょう。
+以下のようにKubernetesは@<code>{/registry/}から始まるキーを利用しています。
+その後ろにリソースのタイプ(podやservice)、ネームスペース(defaultやkube-system)、リソースの名前(mypodやnginx)を@<code>{/}でつないでキーにしています。
 
-例えばKubernetesでは/registry/から始まるキーを使います。(歴史的経緯で一部minionから始まるキーもある)
-
- * /registry/pods/default/mypod
- * /registry/services/kube-system/default
+//terminal{
+$ etcdctl get / --prefix=true --keys-only
+/registry/pods/default/mypod
+/registry/services/kube-system/nginx
+//}
 
 === バリュー
 
-値にはJSONやProtocol Buffer
-最大1MB
+キーは@<code>{/}で区切った文字列を利用することが一般的です。
+ではバリューはどのような形式にするのがよいのでしょうか？
+バリューも内部的にはバイト配列として扱われています。
+1つのバリューのサイズは最大1MBまで格納することができます。
+
+バリューは単純な文字列として格納してもよいですし、構造的なデータを扱いたいのであれば
+JSONやProtocol Bufferなどでエンコードした形式で格納してもよいでしょう。
+
+具体的にKubernetesの例を見てみましょう。
+以下のコマンドを実行してバリューを取得すると、バイナリ形式のデータが出力されます。
+
+//terminal{
+$ etcdctl get /registry/pods/default/mypod
+//}
+
+Kubernetesではv1.6以降はProtocol Buffer形式でデータを格納しているため、そのままでは読むことができません。
+Auger@<fn>{auger}などのツールを利用すればデコードして表示することも可能です。
+
+//footnote[auger][https://github.com/jpbetz/auger]
+
+なお、etcdのデータファイルにはキーバリューの内容がそのまま平文で保存されています。
+秘密情報などを管理したい場合はバリューを暗号化して格納すべきです。

@@ -114,7 +114,7 @@ $ go get -u github.com/cloudflare/cfssl/cmd/cfssljson
 
 この設定ファイルを使用して自己署名ルートCA証明書と秘密鍵を生成します。
 
-//list[][]{
+//terminal{
 #@maprange(../code/chapter4/tls/gen-certs.sh,ca)
 cfssl gencert -initca ca-csr.json | cfssljson -bare certs/ca
 #@end
@@ -188,7 +188,7 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare certs/ca
 #@end
 //}
 
-//list[][]{
+//terminal{
 #@maprange(../code/chapter4/tls/gen-certs.sh,server)
 cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=server server.json | cfssljson -bare certs/server
 #@end
@@ -217,7 +217,7 @@ cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -
 #@end
 //}
 
-//list[][]{
+//terminal{
 #@maprange(../code/chapter4/tls/gen-certs.sh,peer)
 cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=peer etcd1.json | cfssljson -bare certs/etcd1
 #@end
@@ -243,7 +243,7 @@ cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -
 #@end
 //}
 
-//list[][]{
+//terminal{
 #@maprange(../code/chapter4/tls/gen-certs.sh,client)
 cfssl gencert -ca=certs/ca.pem -ca-key=certs/ca-key.pem -config=ca-config.json -profile=client client.json | cfssljson -bare certs/client
 #@end
