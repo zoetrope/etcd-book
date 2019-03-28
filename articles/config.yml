@@ -118,8 +118,8 @@ toclevel: 3               # （部と）章と節と小節を目次に載せる
 # 採番の設定。採番させたくない見出しには「==[nonum]」のようにnonum指定をする
 #
 # 本文でセクション番号を表示する見出しレベル
-secnolevel: 2              # 章 (chapter) と節 (section) にだけ番号をつける
-#secnolevel: 3             # 小節 (subsection) にも番号をつける
+#secnolevel: 2              # 章 (chapter) と節 (section) にだけ番号をつける
+secnolevel: 3             # 小節 (subsection) にも番号をつける
 
 # 以下のsecnolevelはまだ未実装。
 # 前付でセクション番号を表示する見出しレベル(未実装)
