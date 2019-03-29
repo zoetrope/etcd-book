@@ -342,14 +342,18 @@ $ docker-compose up etcd4
 
 == モニタリング
 
-== その他
- * cors
- * discover / naming
+== discover / naming
  go-grpc向けの便利機能。
  gRPCサーバーの接続先が増えた時に自動的に対応。ロードバランスもしてくれる。
  KubernetesとかNaming Service使ってるなら不要。
 
- https://stackoverflow.com/questions/43638397/how-to-use-etcd-in-service-discovery?rq=1
+ 
+
+
+
+
+== その他
+ * cors
 
  * pprof
  * proxy
