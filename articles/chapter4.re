@@ -345,6 +345,12 @@ $ docker-compose up etcd4
 == その他
  * cors
  * discover / naming
+ go-grpc向けの便利機能。
+ gRPCサーバーの接続先が増えた時に自動的に対応。ロードバランスもしてくれる。
+ KubernetesとかNaming Service使ってるなら不要。
+
+ https://stackoverflow.com/questions/43638397/how-to-use-etcd-in-service-discovery?rq=1
+
  * pprof
  * proxy
  * defrag
@@ -352,4 +358,16 @@ $ docker-compose up etcd4
  * balancer (etcd v3.4)
  * leasing
  * ordering
+ 
  * gRPC Proxy(Scalable Watch API)
+ https://coreos.com/etcd/docs/latest/op-guide/grpc_proxy.html
+
+ * grpc-gateway
+ gRPCをJSONのREST形式に変換してくれるだけ。etcdをcurlとかで呼べるのはこれのおかげ。
+
+ * etcd gateway
+ 接続先が変わった時にクライアントを更新するのは面倒。ゲートウェイを使えば、ゲートウェイだけ更新すればよい。
+ ローカルホストを指しておけばいいようにしておく。
+ 各クライアントの動いてるところで動かす必要がある。
+ DNSを使えば自動的に更新することも可能。
+ https://coreos.com/etcd/docs/latest/op-guide/gateway.html
