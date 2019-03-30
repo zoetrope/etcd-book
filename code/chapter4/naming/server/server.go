@@ -1,6 +1,4 @@
-//go:generate protoc -I ../proto --go_out=plugins=grpc:./ ../proto/helloworld.proto
-
-// Package main implements a server for Greeter service.
+//go:generate protoc -I ../pb --go_out=plugins=grpc:./ ../pb/helloworld.proto
 package main
 
 import (
@@ -15,50 +13,38 @@ import (
 	gn "google.golang.org/grpc/naming"
 )
 
-const (
-	port = ":50051"
-)
+type greeter struct{}
 
-// server is used to implement helloworld.GreeterServer.
-type server struct{}
-
-// SayHello implements helloworld.GreeterServer
-func (s *server) SayHello(ctx context.Context, in *HelloRequest) (*HelloReply, error) {
+func (s *greeter) SayHello(ctx context.Context, in *HelloRequest) (*HelloReply, error) {
 	log.Printf("Received: %v", in.Name)
 	return &HelloReply{Message: "Hello " + in.Name}, nil
 }
 
 func main() {
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"http://localhost:2379"},
+		DialTimeout: 3 * time.Second,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
 
-	err := registerService()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	lis, err := net.Listen("tcp", port)
+	resolver := &naming.GRPCResolver{Client: client}
+	err = resolver.Update(context.TODO(), "/chapter4/greeter",
+		gn.Update{Op: gn.Add, Addr: listener.Addr().String()})
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
-	RegisterGreeterServer(s, &server{})
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
-}
-
-func registerService() error {
-	cfg := clientv3.Config{
-		Endpoints:   []string{"http://localhost:2379"},
-		DialTimeout: 3 * time.Second,
+		log.Fatal(err)
 	}
 
-	client, err := clientv3.New(cfg)
-	if err != nil {
-		return err
+	server := grpc.NewServer()
+	RegisterGreeterServer(server, &greeter{})
+	if err := server.Serve(listener); err != nil {
+		log.Fatal(err)
 	}
-	defer client.Close()
-
-	r := &naming.GRPCResolver{Client: client}
-	err = r.Update(context.TODO(), "helloworld", gn.Update{Op: gn.Add, Addr: "127.0.0.1" + port})
-	return err
 }

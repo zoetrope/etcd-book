@@ -1,10 +1,9 @@
-//go:generate protoc -I ../proto --go_out=plugins=grpc:./ ../proto/helloworld.proto
+//go:generate protoc -I ../pb --go_out=plugins=grpc:./ ../pb/helloworld.proto
 package main
 
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -12,44 +11,30 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	address     = "localhost:50051"
-	defaultName = "world"
-)
-
 func main() {
-	cfg := clientv3.Config{
+	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{"http://localhost:2379"},
 		DialTimeout: 3 * time.Second,
-	}
-
-	client, err := clientv3.New(cfg)
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer client.Close()
 
 	resolver := &naming.GRPCResolver{Client: client}
-	b := grpc.RoundRobin(resolver)
+	balancer := grpc.RoundRobin(resolver)
 
-	// Set up a connection to the server.
-	conn, err := grpc.Dial("helloworld", grpc.WithBalancer(b), grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial("/chapter4/greeter", grpc.WithBalancer(balancer),
+		grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatal(err)
 	}
 	defer conn.Close()
 	c := NewGreeterClient(conn)
 
-	// Contact the server and print out its response.
-	name := defaultName
-	if len(os.Args) > 1 {
-		name = os.Args[1]
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	r, err := c.SayHello(ctx, &HelloRequest{Name: name})
+	r, err := c.SayHello(context.TODO(), &HelloRequest{Name: "World!"})
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		log.Fatal(err)
 	}
 	log.Printf("Greeting: %s", r.Message)
 }
