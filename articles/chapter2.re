@@ -489,7 +489,7 @@ etcdは、複数のプログラム間で情報を共有する目的で使われ�
 第2引数で監視対象のキーを指定し、第3引数以降でオプションを指定します。
 ここでは@<code>{clientv3.WithPrefix()}オプションを指定してるため、@<code>{"/chapter2/watch/"}から始まるすべてのキーを監視対象としています。
 
-//list[][]{
+//list[?][]{
 ch := client.Watch(context.TODO(), "/chapter2/watch/", clientv3.WithPrefix())
 //}
 
@@ -497,7 +497,7 @@ ch := client.Watch(context.TODO(), "/chapter2/watch/", clientv3.WithPrefix())
 for文でループを回せば、channelがクローズされるまで通知を受け続けることになります。
 通知は@<code>{WatchResponse}型の変数として受け取ります。
 
-//list[][]{
+//list[?][]{
 for resp := range ch {
     ・・・
 }
@@ -507,7 +507,7 @@ for resp := range ch {
 etcdとの接続が切れた場合や、監視対象のキーがコンパクションで削除された場合にエラーが発生するので、
 適切な対応をおこないます。
 
-//list[][]{
+//list[?][]{
 if resp.Err() != nil {
     log.Fatal(resp.Err())
 }
@@ -518,7 +518,7 @@ if resp.Err() != nil {
 さらにイベントタイプが"PUT"のときに、@<code>{IsCreate()}と@<code>{IsModify()}を利用することで、
 そのキーが新たに作成されたのか変更されたのかを判断することが可能です。
 
-//list[][]{
+//list[?][]{
 for _, ev := range resp.Events {
     switch ev.Type {
     case clientv3.EventTypePut:
@@ -768,7 +768,7 @@ if err != nil {
 == Namespace
 
 @<chap>{chapter1}において、キーにはアプリケーションごとにプレフィックスをつけることが多いと説明しました。
-しかし、アプリケーションを開発する際に、すべてのキーにプレフィックスを指定するのは少々めんどうに感じます。
+しかし、アプリケーションを開発する際に、すべてのキーにプレフィックスを指定するのは少々めんどうではないですか？
 そこで、etcdのクライアントライブラリではnamespaceという機能が提供されています。
 
 

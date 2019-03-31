@@ -67,7 +67,7 @@ func main() {
 	// 	}
 	// }()
 	// time.Sleep(300 * time.Millisecond)
-	//#@@range_begin(watch_file)
+	//#@@range_begin(watch)
 	rev := loadRev()
 	fmt.Printf("loaded revision: %d\n", rev)
 	ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
@@ -78,13 +78,14 @@ func main() {
 		for _, ev := range resp.Events {
 			fmt.Printf("[%d] %s %q : %q\n", ev.Kv.ModRevision, ev.Type, ev.Kv.Key, ev.Kv.Value)
 			doSomething(ev)
+			// gofail: var ExampleOneLine struct{}
 			err := saveRev(ev.Kv.ModRevision)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
 	}
-	//#@@range_end(watch_file)
+	//#@@range_end(watch)
 }
 
 func doSomething(ev *clientv3.Event) {

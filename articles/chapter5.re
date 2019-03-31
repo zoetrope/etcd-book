@@ -191,14 +191,47 @@ http://192.168.99.100:32624
 
 == gofail
 
-watch_fileの例。簡単にはテストできない。
+@<hd>{取りこぼしを防ぐ}で紹介したプログラムでは、取りこぼしを防ぐことはできるが、重複処理が発生する可能性はあると説明しました。
+ではどのような状況で重複処理が発生するのでしょうか？
+もう一度コードを見てみましょう。
 
+//list[?][]{
+#@maprange(../code/chapter2/watch_file/watch_file.go,watch_file)
+    rev := loadRev()
+    fmt.Printf("loaded revision: %d\n", rev)
+    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
+    for resp := range ch {
+        if resp.Err() != nil {
+            log.Fatal(resp.Err())
+        }
+        for _, ev := range resp.Events {
+            fmt.Printf("[%d] %s %q : %q\n", ev.Kv.ModRevision, ev.Type, ev.Kv.Key, ev.Kv.Value)
+            doSomething(ev)
+            err := saveRev(ev.Kv.ModRevision)
+            if err != nil {
+                log.Fatal(err)
+            }
+        }
+    }
+#@end
+//}
+
+このコードでは@<code>{doSomething()}関数で何か重要な処理をおこない、
+@<code>{saveRev()}で処理が完了した値のリビジョンをファイルに書き出しています。
+この@<code>{doSomething()}と@<code>{saveRev()}の間にプログラムがクラッシュしてしまうと、
+処理が完了した値のリビジョンとファイルに保存したリビジョンに不整合が発生してしまい、
+再度このプログラムを実行すると、すでに処理が完了したはずのデータが再度実行されてしまいます。
+
+そんなタイミングでクラッシュするのか？と思われるかもしれませんが、人間がプロセスをkillしたり、OOMによって停止させられたり、
+停電が発生することも考えられます。
+今回の例ではファイルの書き出しをおこなっているので、ストレージが故障したり空き容量がない場合も考えられます。
+信頼性の高いシステムを構築する場合には、様々な異常事態を想定してプログラムを実装する必要があります。
+
+ところで、そのような想定をしたプログラムを実装したとしても、どのようにテストすればいいのでしょうか？
 [gofail](https://github.com/coreos/gofail)は、etcdの開発チームがつくったFailure Injectionのためのツールです。
 Go言語で書かれたプログラム中に故意にエラーを発生させるポイント(failpoint)を埋め込み、任意のタイミングでプログラムの挙動を変えることができます。
-公式ドキュメントに記載されていない項目が多々あるので、詳しい使い方を紹介したいと思います。
 
-
-=== gofailのインストール
+=== gofailを使ってみよう
 
 gofail をインストールします。
 
@@ -206,50 +239,30 @@ gofail をインストールします。
 $ go get -u github.com/etcd-io/gofail/...
 //}
 
-=== failpointの埋め込み
-
-プログラム中にfailpointを埋め込むためには、Go言語のプログラム中に `gofail` というキーワードから始まるコメントを記述します。
-なお、ブロックコメントの場合はfailpointとして認識されないため、必ず行コメントで記述する必要があります。
-
-コメントの1行目にはトリガーとなる変数定義を記述し、2行目以降にはfailpointを有効化した時に実行されるコードを記述することができます。
-複数行の処理を埋め込みたい場合は、空行をあけずにコメントを記述します。
-
-例えば任意の値を返すようなfailpointを埋め込みたい場合は、下記のように1行目に返す値となる変数宣言、2行目にreturnを記述します。
+プログラム中にfailpointを埋め込むためには、プログラム中に@<code>{gofail}というキーワードから始まるコメントを記述します。
+なお、ブロックコメント内に記述してもfailpointとして認識されないため、必ず行コメントで記述する必要があります。
 
 //list[?][]{
-func someFunc() string {
-    // gofail: var SomeFuncString string
-    // return SomeFuncString
-    return "default"
-}
-//}
-
-なお、failpointとなる変数の型は `bool`, `int`, `string`, `struct{}` のみになります。
-
-fail発生後に任意の処理を実行する必要がない場合(panicを発生させる場合など)は、以下のように `struct {}` 型の変数宣言のみを記述します。
-
-//list[?][]{
-func ExampleOneLineFunc() string {
-    // gofail: var ExampleOneLine struct{}
-    return "abc"
-}
-//}
-
-failpointを有効化した時にgotoやラベル付きcontinue文を実行したい場合は、下記のように gofail の後ろにラベル名を記述することもできます。
-
-//list[?][]{
-func ExampleRetry() {
-    // gofail: RETRY:
-    for i := 0; ; i++ {
-        fmt.Println(i)
-        time.Sleep(time.Second)
-        // gofail: var RetryLabel struct{}
-        // goto RETRY
+#@maprange(../code/chapter5/watch_fail/watch_fail.go,watch)
+    rev := loadRev()
+    fmt.Printf("loaded revision: %d\n", rev)
+    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
+    for resp := range ch {
+        if resp.Err() != nil {
+            log.Fatal(resp.Err())
+        }
+        for _, ev := range resp.Events {
+            fmt.Printf("[%d] %s %q : %q\n", ev.Kv.ModRevision, ev.Type, ev.Kv.Key, ev.Kv.Value)
+            doSomething(ev)
+            // gofail: var ExampleOneLine struct{}
+            err := saveRev(ev.Kv.ModRevision)
+            if err != nil {
+                log.Fatal(err)
+            }
+        }
     }
-}
+#@end
 //}
-
-=== failpointを埋め込んでビルド
 
 failpointを埋め込んでビルドするには、まず下記のコマンドを実行します。
 
@@ -260,13 +273,6 @@ $ gofail enable
 するとgofailから始まるコメントを記述した箇所が書き換えられ、`*.fail.go` というファイルが生成されます。
 あとは生成されたコードを含めて通常通りにビルドします。
 
-書き換えられたコードをもとに戻すには、以下のコマンドを実行します。
-
-//terminal{
-$ gofail disable
-//}
-
-=== failpointの有効化
 
 埋め込まれたfailpointは初期状態ではoffになっているので、実際にfailさせるためにはfailpointの有効化をおこなう必要があります。
 failpointを有効化させる手段としては、プログラムの起動時に環境変数で指定するかHTTP APIで有効化するか2通りの方法がありますが、ここではHTTP APIを利用した方法を紹介します。
@@ -310,9 +316,17 @@ failpointを無効化するには下記のAPIを実行します。
 $ curl http://127.0.0.1:1234/my/package/path/SomeFuncString -XDELETE
 //}
 
+
+書き換えられたコードをもとに戻すには、以下のコマンドを実行します。
+必ずもとに戻しておきましょう。
+
+//terminal{
+$ gofail disable
+//}
+
 === failpointで実行可能なアクション
 
-failpointには、下記のアクションを指定することができます。
+上記の例ではpanicを埋め込みましたが、それ以外にも下記のアクションを指定することができます。
 
  * off: failpointの無効化
  * return: 任意の値を返す(返すことのできる型は bool, int, string, struct{} のみ)
@@ -321,6 +335,43 @@ failpointには、下記のアクションを指定することができます�
  * break: デバッガによるbreakを発生させる
  * print: 標準出力に文字列を出力する
 
+コメントの1行目にはトリガーとなる変数定義を記述し、2行目以降にはfailpointを有効化した時に実行されるコードを記述することができます。
+複数行の処理を埋め込みたい場合は、空行をあけずにコメントを記述します。
+
+例えば任意の値を返すようなfailpointを埋め込みたい場合は、下記のように1行目に返す値となる変数宣言、2行目にreturnを記述します。
+
+//list[?][]{
+func someFunc() string {
+    // gofail: var SomeFuncString string
+    // return SomeFuncString
+    return "default"
+}
+//}
+
+なお、failpointとなる変数の型は `bool`, `int`, `string`, `struct{}` のみになります。
+
+fail発生後に任意の処理を実行する必要がない場合(panicを発生させる場合など)は、以下のように `struct {}` 型の変数宣言のみを記述します。
+
+//list[?][]{
+func ExampleOneLineFunc() string {
+    // gofail: var ExampleOneLine struct{}
+    return "abc"
+}
+//}
+
+failpointを有効化した時にgotoやラベル付きcontinue文を実行したい場合は、下記のように gofail の後ろにラベル名を記述することもできます。
+
+//list[?][]{
+func ExampleRetry() {
+    // gofail: RETRY:
+    for i := 0; ; i++ {
+        fmt.Println(i)
+        time.Sleep(time.Second)
+        // gofail: var RetryLabel struct{}
+        // goto RETRY
+    }
+}
+//}
 
 また、failを発生させる回数や確率を指定することもできます。
 
@@ -335,9 +386,3 @@ $ curl http://127.0.0.1:1234/my/package/path/SomeFuncString -XPUT -d'3*return("h
 //terminal{
 $ curl http://127.0.0.1:1234/my/package/path/SomeFuncString -XPUT -d'50.0%return("hello")'
 //}
-
-=== おわりに
-
-gofailを利用すると任意のタイミングでソフトウェアの挙動を変えることができ、Failure Injection Testをおこなう際にはとても便利なので、ぜひ使ってみてください。
-
-我々はgofailを利用した耐障害性試験を実施し、信頼性の高いインフラ基盤の構築を進めています。次回の記事ではそのあたりを詳しく紹介したいと思います。
