@@ -13,7 +13,7 @@ import (
 )
 
 //#@@range_begin(load)
-func loadRev() int64 {
+func nextRev() int64 {
 	p := "./last_revision"
 	f, err := os.Open(p)
 	if err != nil {
@@ -31,7 +31,7 @@ func loadRev() int64 {
 		os.Remove(p)
 		return 0
 	}
-	return rev
+	return rev + 1
 }
 
 //#@@range_end(load)
@@ -68,9 +68,9 @@ func main() {
 	// }()
 	// time.Sleep(300 * time.Millisecond)
 	//#@@range_begin(watch_file)
-	rev := loadRev()
+	rev := nextRev()
 	fmt.Printf("loaded revision: %d\n", rev)
-	ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
+	ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev))
 	for resp := range ch {
 		if resp.Err() != nil {
 			log.Fatal(resp.Err())

@@ -197,9 +197,9 @@ http://192.168.99.100:32624
 
 //list[?][]{
 #@maprange(../code/chapter2/watch_file/watch_file.go,watch_file)
-    rev := loadRev()
+    rev := nextRev()
     fmt.Printf("loaded revision: %d\n", rev)
-    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
+    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev))
     for resp := range ch {
         if resp.Err() != nil {
             log.Fatal(resp.Err())
@@ -242,11 +242,14 @@ $ go get -u github.com/etcd-io/gofail/...
 プログラム中にfailpointを埋め込むためには、プログラム中に@<code>{gofail}というキーワードから始まるコメントを記述します。
 なお、ブロックコメント内に記述してもfailpointとして認識されないため、必ず行コメントで記述する必要があります。
 
+また、mainパッケージ内にはfailpointを記述することはできません。
+
+
 //list[?][]{
-#@maprange(../code/chapter5/watch_fail/watch_fail.go,watch)
+#@maprange(../code/chapter5/failpoint/failpoint.go,watch)
     rev := loadRev()
     fmt.Printf("loaded revision: %d\n", rev)
-    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
+    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev))
     for resp := range ch {
         if resp.Err() != nil {
             log.Fatal(resp.Err())

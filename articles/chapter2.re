@@ -552,9 +552,9 @@ Watch APIを呼び出すときに@<code>{clientv3.WithRev()}オプションを�
 
 //list[watchfile][]{
 #@maprange(../code/chapter2/watch_file/watch_file.go,watch_file)
-    rev := loadRev()
+    rev := nextRev()
     fmt.Printf("loaded revision: %d\n", rev)
-    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
+    ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev))
     for resp := range ch {
         if resp.Err() != nil {
             log.Fatal(resp.Err())
@@ -571,8 +571,7 @@ Watch APIを呼び出すときに@<code>{clientv3.WithRev()}オプションを�
 #@end
 //}
 
-ファイルから前回のリビジョンを読み込み、それをWatchのオプションとして@<code>{clientv3.WithRev()}で指定します。
-ファイルに書き込まれているのは最後に処理したイベントのリビジョン番号なので、次のイベントから通知を開始するために+1した値を指定しています。
+ファイルから次のリビジョンを読み込み、それをWatchのオプションとして@<code>{clientv3.WithRev()}で指定します。
 
 //list[][]{
 rev := loadRev()
@@ -588,12 +587,13 @@ err := saveRev(ev.Kv.ModRevision)
 //}
 
 リビジョン番号をファイルから読み取る処理を以下のように実装します。
+ファイルに書き込まれているのは最後に処理したイベントのリビジョン番号なので、次のイベントから通知を開始するために+1した値を指定しています。
 ファイルが見つからなかった場合や読み取りに失敗した場合は0を返すようにしています。
 @<code>{clientv3.WithRev()}に0を指定した場合は、呼び出した時点からの変更が通知されることになります。
 
 //list[loadrev][リビジョンの読み取り]{
 #@maprange(../code/chapter2/watch_file/watch_file.go,load)
-func loadRev() int64 {
+func nextRev() int64 {
     p := "./last_revision"
     f, err := os.Open(p)
     if err != nil {
@@ -611,7 +611,7 @@ func loadRev() int64 {
         os.Remove(p)
         return 0
     }
-    return rev
+    return rev + 1
 }
 
 #@end
