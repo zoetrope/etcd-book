@@ -309,6 +309,40 @@ $ ETCDCTL_API=3 etcdctl --endpoints=https://172.30.0.11:2379,https://172.30.0.12
 4acd0a1e9189cd7a, started, etcd2, https://etcd2:2380, https://etcd2:2379
 //}
 
+=== クライアント証明書を利用して接続
+
+//list[?][]{
+#@maprange(../code/chapter4/tls/client.go,tls)
+    tlsCfg := &tls.Config{}
+    rootCACert, err := ioutil.ReadFile("./certs/ca.pem")
+    if err != nil {
+        log.Fatal(err)
+    }
+    rootCAs := x509.NewCertPool()
+    ok := rootCAs.AppendCertsFromPEM(rootCACert)
+    if !ok {
+        log.Fatal("failed to parse pem file")
+    }
+    tlsCfg.RootCAs = rootCAs
+
+    cert, err := tls.LoadX509KeyPair("./certs/client.pem", "./certs/client-key.pem")
+    if err != nil {
+        log.Fatal(err)
+    }
+    tlsCfg.Certificates = []tls.Certificate{cert}
+#@end
+//}
+
+//list[?][]{
+#@maprange(../code/chapter4/tls/client.go,client)
+    client, err := clientv3.New(clientv3.Config{
+        Endpoints:   []string{"http://localhost:2379"},
+        DialTimeout: 3 * time.Second,
+        TLS:         tlsCfg,
+    })
+#@end
+//}
+
 == メンバーの追加・削除
 
 //terminal{
@@ -335,6 +369,7 @@ $ docker-compose up etcd4
 == スナップショット
 
 == コンパクション
+
 
 == アップグレード
 

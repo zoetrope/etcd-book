@@ -236,6 +236,8 @@ etcdはMVCC (MultiVersion Concurrency Control)モデルを採用したキーバ�
 
 ただし、すべての履歴を保存しているとディスク容量が逼迫してしまうため、適当なタイミングでコンパクションして古い履歴を削除するのが一般的です。
 
+=== RevisionとVersion
+
 では、具体的にリビジョン番号が更新されていく様子を見てみましょう。
 
 その前に@<code>{client.Get()}の結果を詳しく表示するヘルパー関数を用意しておきます。
@@ -343,7 +345,61 @@ header: cluster_id:14841639068965178418 member_id:10276657743932975437 revision:
 kv[0]: key:"/chapter2/rev/1" create_revision:41 mod_revision:41 version:1 value:"123" 
 //}
 
-ここで説明したリビジョンは、後ほど解説するWatchやTransactionでも利用することになります。
+=== コンパクション
+
+//list[?][compaction]{
+#@maprange(../code/chapter2/compaction/compaction.go,history)
+    client.Put(context.TODO(), "/chapter2/compaction", "hoge")
+    client.Put(context.TODO(), "/chapter2/compaction", "fuga")
+    client.Put(context.TODO(), "/chapter2/compaction", "fuga")
+
+    resp, err := client.Get(context.TODO(), "/chapter2/compaction")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for i := resp.Kvs[0].CreateRevision; i <= resp.Kvs[0].ModRevision; i++ {
+        r, err := client.Get(context.TODO(), "/chapter2/compaction", clientv3.WithRev(i))
+        if err != nil {
+            log.Fatal(err)
+        }
+        fmt.Printf("rev: %d, value: %s\n", i, r.Kvs[0].Value)
+    }
+#@end
+//}
+
+//terminal{
+$ go run ./compaction.go 
+rev: 230, value: hoge
+rev: 231, value: fuga
+rev: 232, value: fuga
+//}
+
+//list[?][compaction]{
+#@maprange(../code/chapter2/compaction/compaction.go,compaction)
+    _, err = client.Compact(context.TODO(), resp.Kvs[0].ModRevision)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("compacted: %d\n", resp.Kvs[0].ModRevision)
+    for i := resp.Kvs[0].CreateRevision; i <= resp.Kvs[0].ModRevision; i++ {
+        r, err := client.Get(context.TODO(), "/chapter2/compaction", clientv3.WithRev(i))
+        if err != nil {
+            fmt.Printf("failed to get: %v\n", err)
+            continue
+        }
+        fmt.Printf("rev: %d, value: %s\n", i, r.Kvs[0].Value)
+    }
+#@end
+//}
+
+//terminal{
+$ go run ./compaction.go 
+compacted: 232
+failed to get: etcdserver: mvcc: required revision has been compacted
+failed to get: etcdserver: mvcc: required revision has been compacted
+rev: 232, value: fuga
+//}
 
 == context
 
@@ -653,7 +709,7 @@ KubernetesではこのLease機能を利用してクラスタ内で発生した�
 
 Lease機能を利用するためには、まずGrantを呼び出してLeaseを作成します。このとき有効期限を秒単位で指定します。
 
-//list[][]{
+//list[?][]{
 lease, err := client.Grant(context.TODO(), 5)
 //}
 
@@ -676,7 +732,7 @@ $ ./lease
 有効期限を設定したキー・バリューでも、@<code>{KeepAliveOnce()}を呼び出すことでその有効期限を延長することができます。
 @<code>{KeepAliveOnce()}の引数には、先ほど作成したleaseのIDを渡します。
 
-//list[][リースの期限を延長する]{
+//list[?][リースの期限を延長する]{
 resp, err = client.KeepAliveOnce(context.TODO(), lease.ID)
 if err != nil {
     log.Fatal(err)
@@ -686,7 +742,7 @@ if err != nil {
 @<code>{KeepAliveOnce()}を呼び出すと、有効期限が最初に指定した時間分だけ延長されます。
 @<code>{KeepAliveOnce()}を周期的に呼び出すための仕組みとして、@<code>{KeepAlive()}があります。
 
-//list[][リースの期限を延長し続ける]{
+//list[?][リースの期限を延長し続ける]{
 _, err = client.KeepAlive(context.TODO(), lease.ID)
 if err != nil {
     log.Fatal(err)
@@ -701,7 +757,7 @@ if err != nil {
 また、指定した期限までまだ時間がある場合でも、そのキーを失効させたい場合があります。
 その場合は、@<code>{Revoke()}を利用します。
 
-//list[][リースを失効させる]{
+//list[?][リースを失効させる]{
 _, err = client.Revoke(context.TODO(), lease.ID)
 if err != nil {
     log.Fatal(err)
@@ -711,3 +767,18 @@ if err != nil {
 
 == Namespace
 
+@<chap>{chapter1}において、キーにはアプリケーションごとにプレフィックスをつけることが多いと説明しました。
+しかし、アプリケーションを開発する際に、すべてのキーにプレフィックスを指定するのは少々めんどうに感じます。
+そこで、etcdのクライアントライブラリではnamespaceという機能が提供されています。
+
+
+
+なお、KVとWatcherとLeaseでそれぞれ異なるnamespaceを指定することができます。
+
+//list[?][]{
+#@maprange(../code/chapter2/namespace/namespace.go,namespace)
+    client.KV = namespace.NewKV(client.KV, "/chapter2")
+    client.Watcher = namespace.NewWatcher(client.Watcher, "/chapter2")
+    client.Lease = namespace.NewLease(client.Lease, "/chapter2")
+#@end
+//}
