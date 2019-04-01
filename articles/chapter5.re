@@ -141,7 +141,7 @@ etcd_server_has_leader{app="etcd",etcd_cluster="example-etcd-cluster",etcd_node=
  * alertmanagerとprometheus-serverのサービスをNodePortに変更
  * alertのrulesを追加
 
-//list[][prometheus-values.yml]{
+//list[?][prometheus-values.yml]{
 #@maprange(../code/chapter5/prometheus/prometheus-values.yml,noleader)
 serverFiles:
   alerts:
@@ -191,7 +191,7 @@ http://192.168.99.100:32624
 
 == gofail
 
-@<hd>{取りこぼしを防ぐ}で紹介したプログラムでは、取りこぼしを防ぐことはできるが、重複処理が発生する可能性はあると説明しました。
+@<hd>{chapter2|Watch|取りこぼしを防ぐ}で紹介したプログラムでは、取りこぼしを防ぐことはできるが、重複処理が発生する可能性はあると説明しました。
 ではどのような状況で重複処理が発生するのでしょうか？
 もう一度コードを見てみましょう。
 

@@ -573,14 +573,14 @@ Watch APIを呼び出すときに@<code>{clientv3.WithRev()}オプションを�
 
 ファイルから次のリビジョンを読み込み、それをWatchのオプションとして@<code>{clientv3.WithRev()}で指定します。
 
-//list[][]{
+//list[?][]{
 rev := loadRev()
 ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev+1))
 //}
 
 通知を受け取ったら、そのイベントを使ってなんらかの処理をおこない、そのときのリビジョン番号をファイルに保存します。
 
-//list[][]{
+//list[?][]{
 fmt.Printf("[%d] %s %q : %q\n", ev.Kv.ModRevision, ev.Type, ev.Kv.Key, ev.Kv.Value)
 doSomething(ev)
 err := saveRev(ev.Kv.ModRevision)
