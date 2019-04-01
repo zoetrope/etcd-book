@@ -247,7 +247,7 @@ $ go get -u github.com/etcd-io/gofail/...
 
 //list[?][]{
 #@maprange(../code/chapter5/failpoint/failpoint.go,watch)
-    rev := loadRev()
+    rev := nextRev()
     fmt.Printf("loaded revision: %d\n", rev)
     ch := client.Watch(context.TODO(), "/chapter2/watch_file", clientv3.WithRev(rev))
     for resp := range ch {

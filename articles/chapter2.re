@@ -767,13 +767,42 @@ if err != nil {
 
 == Namespace
 
-@<chap>{chapter1}において、キーにはアプリケーションごとにプレフィックスをつけることが多いと説明しました。
-しかし、アプリケーションを開発する際に、すべてのキーにプレフィックスを指定するのは少々めんどうではないですか？
+@<chap>{chapter1}において、キーにはアプリケーションごとにプレフィックスをつけることがよくあると説明しました。
+しかし、アプリケーションを開発する際にすべてのキーにプレフィックスを指定するのは少々めんどうではないですか？
 そこで、etcdのクライアントライブラリではnamespaceという機能が提供されています。
 
+キー・バリューの操作(Put, Get, Delete, Txnなど)に関してnamespaceを適用したい場合は、
+以下のように@<code>{namespace.NewKV()}関数を利用して新しいクライアントを作成します。
 
+//list[?][]{
+#@maprange(../code/chapter2/namespace/namespace.go,kv)
+    client2 := namespace.NewKV(client.KV, "/chapter2")
+#@end
+//}
 
-なお、KVとWatcherとLeaseでそれぞれ異なるnamespaceを指定することができます。
+この@<code>{client2}を利用して@<code>{/ns/1}というキーに値を書き込んでみましょう。
+すると実際には@<code>{/chapter2/ns/1}に値が書き込まれていることがわかります。
+
+//list[?][]{
+#@maprange(../code/chapter2/namespace/namespace.go,put)
+    client2.Put(context.TODO(), "/ns/1", "hoge")
+    resp, _ := client.Get(context.TODO(), "/chapter2/ns/1")
+    fmt.Printf("%s: %s\n", resp.Kvs[0].Key, resp.Kvs[0].Value)
+#@end
+//}
+
+逆に@<code>{/chapter2/ns/2}に書き込まれた値を読み取るには、@<code>{/ns/2}というキーを指定する必要があります。
+
+//list[?][]{
+#@maprange(../code/chapter2/namespace/namespace.go,get)
+    client.Put(context.TODO(), "/chapter2/ns/2", "test")
+    resp, _ = client2.Get(context.TODO(), "/ns/2")
+    fmt.Printf("%s: %s\n", resp.Kvs[0].Key, resp.Kvs[0].Value)
+#@end
+//}
+
+また、@<code>{namespace.NewKV()}以外にも、@<code>{NewWatcher()}と@<code>{NewLease()}という関数もあります。
+通常は以下のように既存のクライアントを上書きしてしまうのが使いやすいでしょう。
 
 //list[?][]{
 #@maprange(../code/chapter2/namespace/namespace.go,namespace)

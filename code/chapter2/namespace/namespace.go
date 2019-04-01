@@ -21,20 +21,20 @@ func main() {
 	defer client.Close()
 
 	//#@@range_begin(kv)
-	chapter2KV := namespace.NewKV(client.KV, "/chapter2")
+	client2 := namespace.NewKV(client.KV, "/chapter2")
 	//#@@range_end(kv)
 
-	//#@@range_begin(get)
-	client.Put(context.TODO(), "/chapter2/ns/1", "test")
-	resp, _ := chapter2KV.Get(context.TODO(), "/ns/1")
-	fmt.Printf("%s: %s\n", resp.Kvs[0].Key, resp.Kvs[0].Value)
-	//#@@range_end(get)
-
 	//#@@range_begin(put)
-	chapter2KV.Put(context.TODO(), "/ns/2", "hoge")
-	resp, _ = client.Get(context.TODO(), "/chapter2/ns/2")
+	client2.Put(context.TODO(), "/ns/1", "hoge")
+	resp, _ := client.Get(context.TODO(), "/chapter2/ns/1")
 	fmt.Printf("%s: %s\n", resp.Kvs[0].Key, resp.Kvs[0].Value)
 	//#@@range_end(put)
+
+	//#@@range_begin(get)
+	client.Put(context.TODO(), "/chapter2/ns/2", "test")
+	resp, _ = client2.Get(context.TODO(), "/ns/2")
+	fmt.Printf("%s: %s\n", resp.Kvs[0].Key, resp.Kvs[0].Value)
+	//#@@range_end(get)
 
 	//#@@range_begin(namespace)
 	client.KV = namespace.NewKV(client.KV, "/chapter2")
