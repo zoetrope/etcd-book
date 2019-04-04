@@ -10,61 +10,65 @@ etcdにアクセスするクライアントが常に1つしか存在しないの
 このようなとき、正しくデータの読み書きをおこなわないと、データの不整合が発生する可能性があります。
 例えば、以下のような例をみてみましょう。
 
-//list[conflict][コンフリクトの例]{
+まず@<code>{addValue}という関数を用意します。
+これはetcdから現在の値を読み取り、そこに引数で指定した値を追加して保存するという単純な処理です。
+
+//list[?][]{
+#@maprange(../code/chapter3/conflict/conflict.go,add)
+func addValue(client *clientv3.Client, d int) {
+    resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
+    value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
+    value += d
+    client.Put(context.TODO(), "/chapter3/conflict", strconv.Itoa(value))
+}
+
+#@end
+//}
+
+@<code>{/chapter/conflict}というキーに10をセットします。
+その後に、先程の@<code>{addValue()}関数に5と-3を渡してgoroutineとして並列に実行します。
+
+//list[?][]{
 #@maprange(../code/chapter3/conflict/conflict.go,conflict)
-    addValue := func(d int) {
-        resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
-        value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
-        value += d
-        client.Put(context.TODO(), "/chapter3/conflict", strconv.Itoa(value))
-    }
     client.Put(context.TODO(), "/chapter3/conflict", "10")
-    go addValue(5)
-    go addValue(-3)
+    go addValue(client, 5)
+    go addValue(client, -3)
     time.Sleep(1 * time.Second)
     resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
     fmt.Println(string(resp.Kvs[0].Value))
 #@end
 //}
 
-このコードではまず@<code>{addValue}という関数を用意しています。
-これは現在の値を読み取り、そこに引数で指定した値を追加して保存するという単純な処理です。
-最初に@<code>{/chapter/conflict}というキーに10をセットしています。
-その後に、値に5を追加する処理と、値から3を引く処理をそれぞれgoroutineとして並列に実行しています。
-結果は12になってほしいところです。
+このコードの実行結果は12になってほしいところです。
 しかし実際に実行してみると、結果は15になったり7になったりばらつきます。
 
 Transactionを利用したコードに書き換えてみましょう。
 
 //list[txn][Transaction]{
 #@maprange(../code/chapter3/transaction/transaction.go,txn)
-    addValue := func(d int) {
-    RETRY:
-        resp, _ := client.Get(context.TODO(), "/chapter3/txn")
-        rev := resp.Kvs[0].ModRevision
-        value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
-        value += d
-        tresp, err := client.Txn(context.TODO()).
-            If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev)).
-            Then(clientv3.OpPut("/chapter3/txn", strconv.Itoa(value))).
-            Commit()
-        if err != nil {
-            log.Fatal(err)
-        }
-        if !tresp.Succeeded {
-            goto RETRY
-        }
-    }
-    client.Put(context.TODO(), "/chapter3/txn", "10")
-    go addValue(5)
-    go addValue(-3)
-    time.Sleep(1 * time.Second)
+func addValue(client *clientv3.Client, d int) {
+RETRY:
     resp, _ := client.Get(context.TODO(), "/chapter3/txn")
-    fmt.Println(string(resp.Kvs[0].Value))
+    rev := resp.Kvs[0].ModRevision
+    value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
+    value += d
+    tresp, err := client.Txn(context.TODO()).
+        If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev)).
+        Then(clientv3.OpPut("/chapter3/txn", strconv.Itoa(value))).
+        Commit()
+    if err != nil {
+        log.Fatal(err)
+    }
+    if !tresp.Succeeded {
+        goto RETRY
+    }
+}
+
 #@end
 //}
 
 このコードを実行すると結果は必ず12になり、期待する結果が得られます。
+最初のコードと比べると複雑になっていますが、順に解説していきます。
 
 @<code>{If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev))}では、現在の/chapter3/txnのModRevisionと、最初に値を取得したときのModRevisionを比較しています。
 すなわち、値を取得したときと現在で/chapter3/txnの値が書き換えられていないかどうかをチェックしています。
@@ -76,6 +80,9 @@ Transactionを利用したコードに書き換えてみましょう。
 この値はIfの条件が成立した場合にtrueになります。
 
 === いろいろなif条件
+
+@<code>{If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev))}
+
  ** ターゲット
  *** Value
  *** Version
