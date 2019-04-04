@@ -6,20 +6,19 @@
 == Transaction
 
 etcdにアクセスするクライアントが常に1つしか存在しないのであれば何も問題はありません。
-しかし、実際には複数のクライアントが同時にetcdにデータを書き込んだり読み込んだりします。
+しかし、現実には複数のクライアントが同時にetcdにデータを書き込んだり読み込んだりします。
 このようなとき、正しくデータの読み書きをおこなわないと、データの不整合が発生する可能性があります。
 例えば、以下のような例をみてみましょう。
 
-まず@<code>{addValue}という関数を用意します。
-これはetcdから現在の値を読み取り、そこに引数で指定した値を追加して保存するという単純な処理です。
+etcdから現在の値を読み取り、そこに引数で指定した値を追加して保存するという単純な@<code>{addValue}という関数を用意します。
 
 //list[?][]{
 #@maprange(../code/chapter3/conflict/conflict.go,add)
-func addValue(client *clientv3.Client, d int) {
-    resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
+func addValue(client *clientv3.Client, key string, d int) {
+    resp, _ := client.Get(context.TODO(), key)
     value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
     value += d
-    client.Put(context.TODO(), "/chapter3/conflict", strconv.Itoa(value))
+    client.Put(context.TODO(), key, strconv.Itoa(value))
 }
 
 #@end
@@ -30,31 +29,33 @@ func addValue(client *clientv3.Client, d int) {
 
 //list[?][]{
 #@maprange(../code/chapter3/conflict/conflict.go,conflict)
-    client.Put(context.TODO(), "/chapter3/conflict", "10")
-    go addValue(client, 5)
-    go addValue(client, -3)
+    key := "/chapter3/conflict"
+    client.Put(context.TODO(), key, "10")
+    go addValue(client, key, 5)
+    go addValue(client, key, -3)
     time.Sleep(1 * time.Second)
-    resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
+    resp, _ := client.Get(context.TODO(), key)
     fmt.Println(string(resp.Kvs[0].Value))
 #@end
 //}
 
 このコードの実行結果は12になってほしいところです。
 しかし実際に実行してみると、結果は15になったり7になったりばらつきます。
+片方のgoroutineで値を読み込んでから書き込むまでの間に、もう一方のgoroutineが値を書き換えてしまっているためにこのような問題が発生します。
 
-Transactionを利用したコードに書き換えてみましょう。
+ではこの関数をトランザクションを利用して、問題が起きないように書き換えてみましょう。
 
 //list[txn][Transaction]{
 #@maprange(../code/chapter3/transaction/transaction.go,txn)
-func addValue(client *clientv3.Client, d int) {
+func addValue(client *clientv3.Client, key string, d int) {
 RETRY:
-    resp, _ := client.Get(context.TODO(), "/chapter3/txn")
+    resp, _ := client.Get(context.TODO(), key)
     rev := resp.Kvs[0].ModRevision
     value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
     value += d
     tresp, err := client.Txn(context.TODO()).
-        If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev)).
-        Then(clientv3.OpPut("/chapter3/txn", strconv.Itoa(value))).
+        If(clientv3.Compare(clientv3.ModRevision(key), "=", rev)).
+        Then(clientv3.OpPut(key, strconv.Itoa(value))).
         Commit()
     if err != nil {
         log.Fatal(err)
@@ -70,11 +71,15 @@ RETRY:
 このコードを実行すると結果は必ず12になり、期待する結果が得られます。
 最初のコードと比べると複雑になっていますが、順に解説していきます。
 
-@<code>{If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev))}では、現在の/chapter3/txnのModRevisionと、最初に値を取得したときのModRevisionを比較しています。
+まず、@<code>{rev := resp.Kvs[0].ModRevision}で、指定した値が最後に変更されたときのリビジョンを取得します。
+
+つぎに@<code>{client.Txn()}メソッドを利用して
+@<code>{If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev))}では、
+現在の/chapter3/txnのModRevisionと、最初に値を取得したときのModRevisionを比較しています。
 すなわち、値を取得したときと現在で/chapter3/txnの値が書き換えられていないかどうかをチェックしています。
 
-このifの条件が成立するとThenで指定した処理が実行され、そうでなければElseの処理が実行されます。
-ここではThenの中で値の書き込みをおこない、Elseのなかでは何もしていません。
+このifの条件が成立した場合にだけThenで指定した処理が実行されます。
+ここでは
 
 そして最後にtresp.Succeededをチェックしています。
 この値はIfの条件が成立した場合にtrueになります。

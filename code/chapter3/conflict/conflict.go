@@ -11,11 +11,11 @@ import (
 )
 
 //#@@range_begin(add)
-func addValue(client *clientv3.Client, d int) {
-	resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
+func addValue(client *clientv3.Client, key string, d int) {
+	resp, _ := client.Get(context.TODO(), key)
 	value, _ := strconv.Atoi(string(resp.Kvs[0].Value))
 	value += d
-	client.Put(context.TODO(), "/chapter3/conflict", strconv.Itoa(value))
+	client.Put(context.TODO(), key, strconv.Itoa(value))
 }
 
 //#@@range_end(add)
@@ -33,11 +33,12 @@ func main() {
 	defer client.Close()
 
 	//#@@range_begin(conflict)
-	client.Put(context.TODO(), "/chapter3/conflict", "10")
-	go addValue(client, 5)
-	go addValue(client, -3)
+	key := "/chapter3/conflict"
+	client.Put(context.TODO(), key, "10")
+	go addValue(client, key, 5)
+	go addValue(client, key, -3)
 	time.Sleep(1 * time.Second)
-	resp, _ := client.Get(context.TODO(), "/chapter3/conflict")
+	resp, _ := client.Get(context.TODO(), key)
 	fmt.Println(string(resp.Kvs[0].Value))
 	//#@@range_end(conflict)
 }
