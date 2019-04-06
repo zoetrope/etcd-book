@@ -264,9 +264,14 @@ RETRY:
 
 === STM(Software Transactional Memory)
 
-先程のトランザクション処理をSTMを使って書き換えてみましょう。
+@<hd>{chapter3|Transaction}ではトランザクションを利用してデータの不整合が起きないような処理を記述しました。
+しかし、リビジョンの比較やリトライ処理は少々記述が難しかったのではないでしょうか。
+扱うキーバリューが増えてくるとトランザクションの記述はさらに複雑になります。
+そこで、etcdではSTM(Software Transactional Memory)という仕組みを提供し、簡単に排他制御を記述することが可能になっています。
 
-//list[stm][STM]{
+では先程のトランザクション処理をSTMを使って書き換えてみましょう。
+
+//list[?][]{
 #@maprange(../code/chapter3/stm/stm.go,stm)
 func addValue(client *clientv3.Client, key string, d int) {
     _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
@@ -284,37 +289,59 @@ func addValue(client *clientv3.Client, key string, d int) {
 #@end
 //}
 
-WithIsolation
-WithPrefetch
-WithAbortContext
-
-副作用禁止
-
-値の読み取り方の違い。
-SerializableSnapshotとSerializable
-例えば、トランザクションの中でkey1を読み取ったときのリビジョンが123だった場合、
-同一のトランザクション内で他のキーを読み取るときも必ず同じリビジョン123の値を読み取る
-
-RepeatableReadsとReadCommittedでは、
-トランザクションの中でkey1を読み取ったときのリビジョンが123だった場合でも、
-同一のトランザクション内で他のキーを読み取るときに新しいリビジョンがあれば新しいものを読み込む。
-
-コンフリクトの検出方式の違い。
-ReadCommittedはコンフリクトを検出しない。
-RepeatableReadsとSerializableは、読み取った値が更新されていたらコンフリクト
-SerializableSnapshotは、読み取った値だけでなく書き込む値が更新されていた場合もコンフリクト
+@<code>{concurrency.NewSTM()}を利用して、第2引数で渡した関数の中でキーバリューの操作をおこないます。
+このように記述すると、この関数のなかの処理がトランザクションとして実行されます。
+Getしたキーの値がPutするまでの間に変更された場合はリトライ処理がおこなわれます。
 
 
- * SerializableSnapshot
- ** 分離レベルをSerializable
- ** さらに、最初に値を読み込んだとき
+また@<code>{concurrency.NewSTM()}では、以下のようにオプションを指定することで、
+トランザクション分離レベルを指定することが可能です。
+
+//list[?][]{
+_, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
+    ・・・
+}, concurrency.WithIsolation(concurrency.RepeatableReads))
+//}
+
+トランザクション分離レベルは以下のいずれかを指定することができます。
+上のほうが分離レベルが高くデータの不整合が発生しにくくなりますが、その代わりに並列実行がしにくくなります。
+ 基本的にはデフォルトの@<code>{SerializableSnapshot}を利用すればよいでしょう。
+
+ * SerializableSnapshot (デフォルト)
  * Serializable
- ** 初回のGet時のrevを覚えておく。2回目以降のGetは他のキーの場合でも同じrevを使って読み込む。
  * RepeatableReads
  * ReadCommitted
- ** 一般的なトランザクション分離レベルのRead Committedにはなっていない。
- ** 一切トランザクションになっていないので使うべきではない。
- ** ファジーリードも発生しない。一度readした値はキャッシュしているので必ず同じ値を返す。
+
+分離レベルが異なると値の読み取り方が変わります。
+例えば、以下のように複数の値を読み取る場合、
+SerializableSnapshotとSerializableでは、key1とkey2は必ず同じリビジョンの値が読まれます。
+一方RepeatableReadsとReadCommittedでは、key1とkey2の値が異なるリビジョンから読み込まれる場合があります(ファントムリードと呼びます)。
+
+//list[?][]{
+_, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
+    v1 := stm.Get(key1)
+    v2 := stm.Get(key2)
+        ・・・
+    return nil
+})
+//}
+
+また、分離レベルが異なるとコンフリクトの検出方式も変わります。
+以下のようにkey1の値を読み取って加工し、key2に書き込むような処理を考えてみます。
+
+//list[?][]{
+_, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
+    v1 := stm.Get(key1)
+    v2 := translate(v1)
+    stm.Put(key2, v2)
+    return nil
+})
+//}
+
+SerializableSnapshotでは、key1とkey2の
+ReadCommittedはコンフリクトを検出しない。
+RepeatableReadsとSerializableは、読み取った値が更新されていたらコンフリクト
+
 
 === Leader Election
 
