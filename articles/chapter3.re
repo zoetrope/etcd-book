@@ -154,18 +154,51 @@ ModRevisionの比較をおこなっていました。
 
 また、@<code>{If(clientv3util.KeyExists(key))}や@<code>{If(clientv3util.KeyMissing(key))}を
 利用すれば、キーの有無によって条件分岐をすることが可能です。
-なお、これらを利用するためには@<code>{import "github.com/coreos/etcd/clientv3/clientv3util"}が必要になります。
+なお、これらを利用するためには@<code>{"github.com/coreos/etcd/clientv3/clientv3util"}パッケージをインポートする必要があります。
 
 == Concurrency
 
-利用するためには@<code>{"github.com/coreos/etcd/clientv3/concurrency"}パッケージをインポートする必要があります。
+etcdでは分散システムを開発するために便利な機能をconcurrencyパッケージとして提供しています。
+ここでは、Mutex、STM(Software Transactional Memory)、Leader Electionという3つの機能を紹介します。
 
-Sessionは、Lease機能をいいかんじに使えるようにしたClientのラッパーみたいなもの？
-MutexやLeaderElectionで利用する。
+なお、これらを利用するためには@<code>{"github.com/coreos/etcd/clientv3/concurrency"}パッケージをインポートする必要があります。
+
+=== Session
+
+concurrencyパッケージの各機能を解説する前に、Session機能について紹介しておきましょう。
+
+後に解説するMutexでは、ロック済みかどうかを表すためにキーバリューを利用します。
+もしロックを取得したプロセスがロックを解除しないまま終了してしまったら、非常に困ったことになってしまうでしょう。
+Sessionを利用すると、作成したキーにリース期間が設定されるため、プロセスが不意に終了してもキーの有効期限が過ぎたらロックは解除されます。
+また、プロセスが生きている間はリース期間を更新し続けるようにもなっています。
+
+Sessionは以下のように作成することができます。
+
+//list[?][]{
+session, err := concurrency.NewSession(client)
+//}
+
+なお、デフォルトでのリース期間は60秒に設定されています。
+この時間を変更したい場合は、次のように@<code>{concurrency.WithTTL()}を利用することができます。
+
+//list[?][]{
+session, err := concurrency.NewSession(client, concurrency.WithTTL(180))
+//}
+
+また、ロックを取得したプロセスが何か処理をしているときに、
+etcdとの接続が切れてしまっていたりリースを失効していた場合は、即座に処理を中止すべきでしょう。
+Sessionの@<code>{Done()}メソッドを利用すれば、セッションが切れた通知を受け取ることが可能です。
+
+//list[?][]{
+select {
+case <-session.Done():
+    log.Fatal("session has been orphaned")
+}
+//}
 
 === Mutex
 
-//list[mutex][ロック]{
+//list[?][]{
 #@maprange(../code/chapter3/mutex/mutex.go,lock)
     s, err := concurrency.NewSession(client)
     if err != nil {
@@ -197,7 +230,7 @@ OSが提供するMutexとは異なり
 そこで、ロックを取ったあとにetcdのキーバリューの操作をおこなう際には、トランザクションを利用してIf条件に@<code>{Mutex.IsOwner()}を指定しましょう。
 
 //list[owner][IsOwner]{
-#@maprange(../code/chapter3/mutex/mutex.go,owner)
+#@maprange(../code/chapter3/mutex_txn/mutex_txn.go,owner)
 RETRY:
     select {
     case <-s.Done():
@@ -215,7 +248,7 @@ RETRY:
     if err != nil {
         log.Fatal(err)
     }
-    if resp.Succeeded {
+    if !resp.Succeeded {
         fmt.Println("the lock was not acquired")
         m.Unlock(context.TODO())
         goto RETRY
@@ -235,29 +268,19 @@ RETRY:
 
 //list[stm][STM]{
 #@maprange(../code/chapter3/stm/stm.go,stm)
-    addValue := func(d int) {
-        _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
-            v := stm.Get("/chapter3/stm")
-            value, err := strconv.Atoi(v)
-            if err != nil {
-                return err
-            }
-            value += d
-            stm.Put("/chapter3/stm", strconv.Itoa(value))
-            return nil
-        })
-        if err != nil {
-            log.Fatal(err)
-        }
+func addValue(client *clientv3.Client, key string, d int) {
+    _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
+        v := stm.Get(key)
+        value, _ := strconv.Atoi(v)
+        value += d
+        stm.Put(key, strconv.Itoa(value))
+        return nil
+    })
+    if err != nil {
+        log.Fatal(err)
     }
+}
 
-    client.Put(context.TODO(), "/chapter3/stm", "10")
-    go addValue(5)
-    go addValue(-3)
-
-    time.Sleep(1 * time.Second)
-    resp, _ := client.Get(context.TODO(), "/chapter3/stm")
-    fmt.Println(string(resp.Kvs[0].Value))
 #@end
 //}
 
@@ -266,6 +289,21 @@ WithPrefetch
 WithAbortContext
 
 副作用禁止
+
+値の読み取り方の違い。
+SerializableSnapshotとSerializable
+例えば、トランザクションの中でkey1を読み取ったときのリビジョンが123だった場合、
+同一のトランザクション内で他のキーを読み取るときも必ず同じリビジョン123の値を読み取る
+
+RepeatableReadsとReadCommittedでは、
+トランザクションの中でkey1を読み取ったときのリビジョンが123だった場合でも、
+同一のトランザクション内で他のキーを読み取るときに新しいリビジョンがあれば新しいものを読み込む。
+
+コンフリクトの検出方式の違い。
+ReadCommittedはコンフリクトを検出しない。
+RepeatableReadsとSerializableは、読み取った値が更新されていたらコンフリクト
+SerializableSnapshotは、読み取った値だけでなく書き込む値が更新されていた場合もコンフリクト
+
 
  * SerializableSnapshot
  ** 分離レベルをSerializable
@@ -277,40 +315,6 @@ WithAbortContext
  ** 一般的なトランザクション分離レベルのRead Committedにはなっていない。
  ** 一切トランザクションになっていないので使うべきではない。
  ** ファジーリードも発生しない。一度readした値はキャッシュしているので必ず同じ値を返す。
-
-//list[phantom][ファントムリード]{
-#@maprange(../code/chapter3/isolation/isolation.go,phantom)
-    addValue := func(d int) {
-        _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
-            v1 := stm.Get("/chapter3/iso/phantom/key1")
-            value := 0
-            if len(v1) != 0 {
-                value, _ = strconv.Atoi(v1)
-            }
-            value += d
-            time.Sleep(time.Duration(rand.Intn(3)) * time.Second)
-            v2 := stm.Get("/chapter3/iso/phantom/key2")
-            if v1 != v2 {
-                fmt.Printf("phantom:%d, %s, %s\n", d, v1, v2)
-            }
-            stm.Put("/chapter3/iso/phantom/key1", strconv.Itoa(value))
-            stm.Put("/chapter3/iso/phantom/key2", strconv.Itoa(value))
-            return nil
-        }, concurrency.WithIsolation(concurrency.RepeatableReads))
-        if err != nil {
-            log.Fatal(err)
-        }
-    }
-
-    client.Delete(context.TODO(), "/chapter3/iso/phantom/", clientv3.WithPrefix())
-    go addValue(5)
-    go addValue(-3)
-
-    time.Sleep(5 * time.Second)
-    resp, _ := client.Get(context.TODO(), "/chapter3/iso/phantom/key1")
-    fmt.Println(string(resp.Kvs[0].Value))
-#@end
-//}
 
 === Leader Election
 

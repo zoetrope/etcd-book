@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
-	"flag"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/clientv3/clientv3util"
 	"github.com/coreos/etcd/clientv3/concurrency"
 )
 
@@ -21,44 +20,38 @@ func main() {
 	}
 	defer client.Close()
 
-	flag.Parse()
-	if flag.NArg() != 1 {
-		log.Fatal("usage: ./leader_txn NAME")
-	}
-	name := flag.Arg(0)
-	s, err := concurrency.NewSession(client, concurrency.WithTTL(10))
+	s, err := concurrency.NewSession(client)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer s.Close()
-	e := concurrency.NewElection(s, "/chapter3/leader_txn")
-
-	//#@@range_begin(txn)
+	m := concurrency.NewMutex(s, "/chapter3/mutex")
+	//#@@range_begin(owner)
 RETRY:
 	select {
 	case <-s.Done():
 		log.Fatal("session has been orphaned")
 	default:
 	}
-	err = e.Campaign(context.TODO(), name)
+	err = m.Lock(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
-	leaderKey := e.Key()
-	resp, err := s.Client().Txn(context.TODO()).
-		If(clientv3util.KeyExists(leaderKey)).
-		Then(clientv3.OpPut("/chapter3/leader_txn_value", "value")).
+	resp, err := client.Txn(context.TODO()).
+		If(m.IsOwner()).
+		Then(clientv3.OpPut("/chapter3/mutex/owner", "test")).
 		Commit()
 	if err != nil {
 		log.Fatal(err)
 	}
 	if !resp.Succeeded {
+		fmt.Println("the lock was not acquired")
+		m.Unlock(context.TODO())
 		goto RETRY
 	}
-	//#@@range_end(txn)
-
-	err = e.Resign(context.TODO())
+	// do something
+	err = m.Unlock(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
+	//#@@range_end(owner)
 }
