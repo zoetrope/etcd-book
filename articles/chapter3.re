@@ -8,7 +8,7 @@
 etcdにアクセスするクライアントが常に1つしか存在しないのであれば何も問題はありません。
 しかし、現実には複数のクライアントが同時にetcdにデータを書き込んだり読み込んだりします。
 このようなとき、正しくデータの読み書きをおこなわないと、データの不整合が発生する可能性があります。
-例えば、以下のような例をみてみましょう。
+例えば以下のような例をみてみましょう。
 
 etcdから現在の値を読み取り、そこに引数で指定した値を追加して保存するという単純な@<code>{addValue}という関数を用意します。
 
@@ -68,47 +68,93 @@ RETRY:
 #@end
 //}
 
+etcdにおけるトランザクションは楽観ロック方式です。
+すなわち、データに対してのロックはおこなわず、データ取得時から更新時の間に変更がおこなわれていなければデータを更新し、
+そうでなければデータを更新しないという方式です。
+
 このコードを実行すると結果は必ず12になり、期待する結果が得られます。
 最初のコードと比べると複雑になっていますが、順に解説していきます。
 
-まず、@<code>{rev := resp.Kvs[0].ModRevision}で、指定した値が最後に変更されたときのリビジョンを取得します。
+まず@<code>{Get()}で値を取得し、このときの@<code>{ModRevision}を保持しておきます。
 
-つぎに@<code>{client.Txn()}メソッドを利用して
-@<code>{If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev))}では、
-現在の/chapter3/txnのModRevisionと、最初に値を取得したときのModRevisionを比較しています。
-すなわち、値を取得したときと現在で/chapter3/txnの値が書き換えられていないかどうかをチェックしています。
+つぎに@<code>{client.Txn()}メソッドを利用してトランザクションを開始します。
+@<code>{If(clientv3.Compare(clientv3.ModRevision(key), "=", rev))}では、
+指定したキーの現在の@<code>{ModRevision}と、最初に値を取得したときの@<code>{ModRevision}を比較しています。
+すなわち、値を取得したときから現在までの間に値が書き換えられていないかどうかをチェックしています。
 
-このifの条件が成立した場合にだけThenで指定した処理が実行されます。
-ここでは
+このIfの条件が成立した場合にThenで指定した処理が実行されます。
+ここでは@<code>{clientv3.OpPut()}を利用してデータの書き込みをおこなっています。
+最後に@<code>{Commit()}でトランザクションを完了します。
 
-そして最後にtresp.Succeededをチェックしています。
+トランザクション後に@<code>{tresp.Succeeded}をチェックしています。
 この値はIfの条件が成立した場合にtrueになります。
+ここでは、Ifの条件が成立しなかった、すなわちデータの書き込みがおこなえなかった場合に、
+最初から処理をやり直すようにしています。
 
-=== いろいろなif条件
+=== トランザクションの記法
 
-@<code>{If(clientv3.Compare(clientv3.ModRevision("/chapter3/txn"), "=", rev))}
+etcdのトランザクションは、基本的に次のような順序でメソッドを呼び出して利用します。
 
- ** ターゲット
- *** Value
- *** Version
- *** CreateRevision
- *** ModRevision
- *** LeaseValue
- ** 演算子
- *** "="
- *** "!="
- *** "<"
- *** ">"
- ** KeyMissing
- ** KeyExists
-=== Else
-=== 複数の処理を同時実行するだけ
- ** OpGet
- ** OpPut
- ** OpDelete
- ** OpTxn
- ** OpCompact
-=== ネストしたトランザクション
+//list[?][]{
+tresp, err := client.Txn(context.TODO()).
+    If(・・・).
+    Then(・・・).
+    Else(・・・).
+    Commit()
+//}
+
+このとき、If, Then, Elseはそれぞれ省略することができます。ただし2回以上記述することはできません。
+また、Thenの後にIfを呼び出したり、Elseの後にThenを呼び出すなど順序を入れ替えることもできません。
+
+Ifは条件を複数指定することができます。指定した条件はAND条件となります。
+
+//list[?][]{
+tresp, err := client.Txn(context.TODO()).
+    If(
+        clientv3.Compare(clientv3.ModRevision(key1), "=", rev1),
+        clientv3.Compare(clientv3.ModRevision(key2), "=", rev2),
+    ).
+    Then(・・・).
+    Commit()
+//}
+
+ThenやElseで実行する処理を複数指定することもできます。
+次のようにPutとDeletを1つのトランザクション内で同時に実行することができます。
+
+//list[?][]{
+tresp, err := client.Txn(context.TODO()).
+    Then(
+        clientv3.OpPut(key1, value1),
+        clientv3.OpDelete(key2),
+    ).
+    Commit()
+if err != nil {
+    return err
+}
+presp := tresp.Responses[0].GetResponsePut()
+dresp := tresp.Responses[1].GetResponseDeleteRange()
+//}
+
+このとき、PutやDeleteの結果は@<code>{tresp.Responses}にスライスとして入っています。
+@<code>{GetResponsePut()}や@<code>{GetResponseDeleteRange()}などを利用すると、
+それぞれのオペレーションに応じたレスポンスの型にキャストすることができます。
+
+オペレーションは、@<code>{clientv3.OpGet()}、@<code>{clientv3.OpPut()}、@<code>{clientv3.OpDelete()}、
+@<code>{clientv3.OpTxn()}などが利用できます。
+@<code>{clientv3.OpTxn()}を利用すれば、ネストした複雑なトランザクションを記述することも可能です。
+
+=== いろいろなIf条件
+
+前述の例では@<code>{If(clientv3.Compare(clientv3.ModRevision(key), "=", rev))}のように、
+ModRevisionの比較をおこなっていました。
+これ以外にも@<code>{clientv3.Value()}で値の比較、@<code>{clientv3.Version()}でバージョンの比較、
+@<code>{clientv3.CreateRevision()}でCreateRevisionのリビジョンの比較などをおこなうことが可能です。
+
+また比較演算子は@<code>{"="}の他に@<code>{"!="}、@<code>{"<"}、@<code>{">"}が利用できます。
+
+また、@<code>{If(clientv3util.KeyExists(key))}や@<code>{If(clientv3util.KeyMissing(key))}を
+利用すれば、キーの有無によって条件分岐をすることが可能です。
+なお、これらを利用するためには@<code>{import "github.com/coreos/etcd/clientv3/clientv3util"}が必要になります。
 
 == Concurrency
 
