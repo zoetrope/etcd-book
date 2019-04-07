@@ -43,9 +43,9 @@ func addValue(client *clientv3.Client, key string, d int) {
 しかし実際に実行してみると、結果は15になったり7になったりばらつきます。
 片方のgoroutineで値を読み込んでから書き込むまでの間に、もう一方のgoroutineが値を書き換えてしまっているためにこのような問題が発生します。
 
-ではこの関数をトランザクションを利用して、問題が起きないように書き換えてみましょう。
+ではこの@<code>{addValue()}関数を、トランザクションを利用して問題が起きないように書き換えてみましょう。
 
-//list[txn][Transaction]{
+//list[?][]{
 #@maprange(../code/chapter3/transaction/transaction.go,txn)
 func addValue(client *clientv3.Client, key string, d int) {
 RETRY:
@@ -69,27 +69,27 @@ RETRY:
 //}
 
 etcdにおけるトランザクションは楽観ロック方式です。
-すなわち、データに対してのロックはおこなわず、データ取得時から更新時の間に変更がおこなわれていなければデータを更新し、
+すなわちデータに対してのロックはせず、データを取得してから更新するまでの間に変更がなければデータを更新し、
 そうでなければデータを更新しないという方式です。
 
 このコードを実行すると結果は必ず12になり、期待する結果が得られます。
 最初のコードと比べると複雑になっていますが、順に解説していきます。
 
-まず@<code>{Get()}で値を取得し、このときの@<code>{ModRevision}を保持しておきます。
+まず@<code>{client.Get()}で値を取得し、このときの@<code>{ModRevision}を保持しておきます。
 
 つぎに@<code>{client.Txn()}メソッドを利用してトランザクションを開始します。
 @<code>{If(clientv3.Compare(clientv3.ModRevision(key), "=", rev))}では、
 指定したキーの現在の@<code>{ModRevision}と、最初に値を取得したときの@<code>{ModRevision}を比較しています。
 すなわち、値を取得したときから現在までの間に値が書き換えられていないかどうかをチェックしています。
 
-このIfの条件が成立した場合にThenで指定した処理が実行されます。
-ここでは@<code>{clientv3.OpPut()}を利用してデータの書き込みをおこなっています。
-最後に@<code>{Commit()}でトランザクションを完了します。
+この@<code>{If}の条件が成立した場合に@<code>{Then}で指定した処理が実行されます。
+ここでは@<code>{clientv3.OpPut()}を利用してデータを書き込んでいます。
+最後に@<code>{Commit()}でトランザクションをコミットします。
 
-トランザクション後に@<code>{tresp.Succeeded}をチェックしています。
-この値はIfの条件が成立した場合にtrueになります。
-ここでは、Ifの条件が成立しなかった、すなわちデータの書き込みがおこなえなかった場合に、
-最初から処理をやり直すようにしています。
+トランザクションの@<code>{If}の条件が成立しなくてもエラーにはなりません。
+@<code>{If}の条件が成立したかどうかは、レスポンスの@<code>{Succeeded}で判断することができます。
+ここでは@<code>{If}の条件が成立しなかった、すなわち最初にデータを取得したときと書き込むときの
+リビジョンが異なり、データが書き込めなかった場合に@<code>{goto}を使って最初から処理をやり直しています。
 
 === トランザクションの記法
 
@@ -103,10 +103,13 @@ tresp, err := client.Txn(context.TODO()).
     Commit()
 //}
 
-このとき、If, Then, Elseはそれぞれ省略することができます。ただし2回以上記述することはできません。
-また、Thenの後にIfを呼び出したり、Elseの後にThenを呼び出すなど順序を入れ替えることもできません。
+このとき、@<code>{If}、@<code>{Then}、@<code>{Else}はそれぞれ省略することができます。
+ただし2回以上記述することはできません。
+また、@<code>{Then}の後に@<code>{If}を呼び出したり、
+@<code>{Else}の後に@<code>{Then}を呼び出すなど順序を入れ替えることもできません。
 
-Ifは条件を複数指定することができます。指定した条件はAND条件となります。
+@<code>{If}は条件を複数指定することができます。
+指定した条件はAND条件となります。
 
 //list[?][]{
 tresp, err := client.Txn(context.TODO()).
@@ -118,8 +121,8 @@ tresp, err := client.Txn(context.TODO()).
     Commit()
 //}
 
-ThenやElseで実行する処理を複数指定することもできます。
-次のようにPutとDeletを1つのトランザクション内で同時に実行することができます。
+@<code>{Then}や@<code>{Else}で実行する処理を複数指定することもできます。
+次のように@<code>{Put}と@<code>{Delete}を1つのトランザクション内で同時に実行することができます。
 
 //list[?][]{
 tresp, err := client.Txn(context.TODO()).
@@ -135,12 +138,12 @@ presp := tresp.Responses[0].GetResponsePut()
 dresp := tresp.Responses[1].GetResponseDeleteRange()
 //}
 
-このとき、PutやDeleteの結果は@<code>{tresp.Responses}にスライスとして入っています。
-@<code>{GetResponsePut()}や@<code>{GetResponseDeleteRange()}などを利用すると、
+このとき、@<code>{Put}や@<code>{Delete}の結果は@<code>{tresp.Responses}にスライスとして入っています。
+@<code>{GetResponsePut()}や@<code>{GetResponseDeleteRange()}を利用すると、
 それぞれのオペレーションに応じたレスポンスの型にキャストすることができます。
 
 オペレーションは、@<code>{clientv3.OpGet()}、@<code>{clientv3.OpPut()}、@<code>{clientv3.OpDelete()}、
-@<code>{clientv3.OpTxn()}などが利用できます。
+@<code>{clientv3.OpTxn()}、@<code>{clientv3.OpCompact()}が利用できます。
 @<code>{clientv3.OpTxn()}を利用すれば、ネストした複雑なトランザクションを記述することも可能です。
 
 === いろいろなIf条件
@@ -148,11 +151,11 @@ dresp := tresp.Responses[1].GetResponseDeleteRange()
 前述の例では@<code>{If(clientv3.Compare(clientv3.ModRevision(key), "=", rev))}のように、
 ModRevisionの比較をおこなっていました。
 これ以外にも@<code>{clientv3.Value()}で値の比較、@<code>{clientv3.Version()}でバージョンの比較、
-@<code>{clientv3.CreateRevision()}でCreateRevisionのリビジョンの比較などをおこなうことが可能です。
+@<code>{clientv3.CreateRevision()}でCreateRevisionの比較をすることが可能です。
 
 また比較演算子は@<code>{"="}の他に@<code>{"!="}、@<code>{"<"}、@<code>{">"}が利用できます。
 
-また、@<code>{If(clientv3util.KeyExists(key))}や@<code>{If(clientv3util.KeyMissing(key))}を
+@<code>{If(clientv3util.KeyExists(key))}や@<code>{If(clientv3util.KeyMissing(key))}を
 利用すれば、キーの有無によって条件分岐をすることが可能です。
 なお、これらを利用するためには@<code>{"github.com/coreos/etcd/clientv3/clientv3util"}パッケージをインポートする必要があります。
 
@@ -160,8 +163,7 @@ ModRevisionの比較をおこなっていました。
 
 etcdでは分散システムを開発するために便利な機能をconcurrencyパッケージとして提供しています。
 ここでは、Mutex、STM(Software Transactional Memory)、Leader Electionという3つの機能を紹介します。
-
-なお、これらを利用するためには@<code>{"github.com/coreos/etcd/clientv3/concurrency"}パッケージをインポートする必要があります。
+これらを利用するためには@<code>{"github.com/coreos/etcd/clientv3/concurrency"}パッケージをインポートする必要があります。
 
 === Session
 
@@ -169,6 +171,7 @@ concurrencyパッケージの各機能を解説する前に、Session機能に�
 
 後に解説するMutexでは、ロック済みかどうかを表すためにキーバリューを利用します。
 もしロックを取得したプロセスがロックを解除しないまま終了してしまったら、非常に困ったことになってしまうでしょう。
+
 Sessionを利用すると、作成したキーにリース期間が設定されるため、プロセスが不意に終了してもキーの有効期限が過ぎたらロックは解除されます。
 また、プロセスが生きている間はリース期間を更新し続けるようにもなっています。
 
@@ -186,7 +189,7 @@ session, err := concurrency.NewSession(client, concurrency.WithTTL(180))
 //}
 
 また、ロックを取得したプロセスが何か処理をしているときに、
-etcdとの接続が切れてしまっていたりリースを失効していた場合は、即座に処理を中止すべきでしょう。
+etcdとの接続が切れてしまっていたりリースを失効していた場合は、処理を中止すべきでしょう。
 Sessionの@<code>{Done()}メソッドを利用すれば、セッションが切れた通知を受け取ることが可能です。
 
 //list[?][]{
@@ -289,12 +292,11 @@ func addValue(client *clientv3.Client, key string, d int) {
 #@end
 //}
 
-@<code>{concurrency.NewSTM()}を利用して、第2引数で渡した関数の中でキーバリューの操作をおこないます。
+@<code>{concurrency.NewSTM()}を利用して、第2引数で渡した関数の中でキーバリューを操作します。
 このように記述すると、この関数のなかの処理がトランザクションとして実行されます。
-Getしたキーの値がPutするまでの間に変更された場合はリトライ処理がおこなわれます。
+Getしたキーの値がトランザクションが完了するまでの間に変更された場合は、自動的に処理がリトライされます。
 
-
-また@<code>{concurrency.NewSTM()}では、以下のようにオプションを指定することで、
+また@<code>{concurrency.NewSTM()}に以下のようにオプションを指定することで、
 トランザクション分離レベルを指定することが可能です。
 
 //list[?][]{
@@ -305,7 +307,7 @@ _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
 
 トランザクション分離レベルは以下のいずれかを指定することができます。
 上のほうが分離レベルが高くデータの不整合が発生しにくくなりますが、その代わりに並列実行がしにくくなります。
- 基本的にはデフォルトの@<code>{SerializableSnapshot}を利用すればよいでしょう。
+基本的にはデフォルトの@<code>{SerializableSnapshot}を利用すればよいでしょう。
 
  * SerializableSnapshot (デフォルト)
  * Serializable
@@ -338,10 +340,14 @@ _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
 })
 //}
 
-SerializableSnapshotでは、key1とkey2の
-ReadCommittedはコンフリクトを検出しない。
-RepeatableReadsとSerializableは、読み取った値が更新されていたらコンフリクト
+SerializableSnapshotでは、key1を読み取ってからトランザクションが完了するまでの間に、
+key1とkey2の値が更新されていたらコンフリクトとみなします。
+すなわち、読み取りに利用したキーと書き込みに利用したキーの両方をコンフリクトの判定に使います。
 
+RepeatableReadsとSerializableは、key1が更新されていたらコンフリクトになります。
+すなわち、読み取りに利用したキーのみをコンフリクトの判定に使います。
+
+ReadCommittedはまったくコンフリクトを検出しません。通常は利用しないほうがよいでしょう。
 
 === Leader Election
 
