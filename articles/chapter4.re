@@ -90,6 +90,10 @@ $ go get -u github.com/cloudflare/cfssl/cmd/cfssl
 $ go get -u github.com/cloudflare/cfssl/cmd/cfssljson
 //}
 
+TODO: 
+ * これから何をするのか箇条書き。
+ * 不特定多数から接続されるわけではないので自己証明書でよい
+
 まずCSR(証明書署名要求)の設定ファイルを作成します。
 このファイルには、公開鍵の暗号化方式や組織の所在地などを含めます。
 

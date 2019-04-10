@@ -201,20 +201,26 @@ case <-session.Done():
 
 === Mutex
 
+Mutexは排他制御を実現するための機構です。
+
+一般的なMutexは異なるスレッド間やプロセス間での排他制御を実現するために利用されます。
+etcdの提供するMutexでは異なるサーバ上のプロセス間での排他制御が可能になります。
+
+
 //list[?][]{
 #@maprange(../code/chapter3/mutex/mutex.go,lock)
-    s, err := concurrency.NewSession(client)
+    session, err := concurrency.NewSession(client)
     if err != nil {
         log.Fatal(err)
     }
-    m := concurrency.NewMutex(s, "/chapter3/mutex")
-    err = m.Lock(context.TODO())
+    mutex := concurrency.NewMutex(session, "/chapter3/mutex")
+    err = mutex.Lock(context.TODO())
     if err != nil {
         log.Fatal(err)
     }
     fmt.Println("acquired lock")
     time.Sleep(5 * time.Second)
-    err = m.Unlock(context.TODO())
+    err = mutex.Unlock(context.TODO())
     if err != nil {
         log.Fatal(err)
     }
@@ -222,42 +228,69 @@ case <-session.Done():
 #@end
 //}
 
-ロックを取ったままプログラムが終了してしまったら？
-リースが設定してあるので大丈夫。
+Mutexは、前節で解説したSessionと、ロック用のキープレフィックスを指定して作成します。
+ここで指定したキープレフィックスをもとに排他制御されるので、複数のプロセス間で同じキープレフィックスを指定する必要があります。
+
+//list[?][]{
+mutex := concurrency.NewMutex(session, "/chapter3/mutex")
+//}
+
+作成したMutexを利用してロックを取得します。
+
+//list[?][]{
+err = mutex.Lock(context.TODO())
+//}
+
+このときロックが取得できれば呼び出しは成功しますが、すでに他のプロセスがロックを取得済みだった場合は、
+ロックが取得できるまでブロックされます。
+ロックが取得できなかったときにタイムアウトさせたい場合は、タイムアウトを設定した@<code>{context}を渡します。
+
+ロックが必要な処理が終わったらロックを解放します。
+解放漏れを防ぐためにも、@<code>{defer}を利用してスコープを抜けたときに必ずロックを解放するのがおすすめです。
+
+//list[?][]{
+err = mutex.Unlock(context.TODO())
+//}
+
+このコードを複数個実行してみましょう。
+いずれかのプロセスがロックを取得している間は、他のプロセスがロック取得待ちになることを確認できます。
+
+また、ロック取得中のプロセスをCtrl+Cで強制終了してみるとどうでしょうか？
+その場合はリース期間(デフォルトでは60秒)経過するまでは、いずれのプロセスもロックを取得できずに待ち状態になるでしょう。
+
 
 さて、ロックが取れたからといって安心してはいけません。
-OSが提供するMutexとは異なり
-ロックした後に一度ネットワーク接続が切れて、ロックのキーのリース期間が終了しているかもしれません。
+ロックした後に一度ネットワーク接続が切れていたり、Sessionのリース期間が終了しているかもしれません。
 そうなってしまうと、プログラムは自分がロックしたつもりで動作しているのに、実際にはロックされていないという状況に陥ってしまいます。
 
 そこで、ロックを取ったあとにetcdのキーバリューを操作する際には、トランザクションを利用してIf条件に@<code>{Mutex.IsOwner()}を指定しましょう。
 
 //list[owner][IsOwner]{
 #@maprange(../code/chapter3/mutex_txn/mutex_txn.go,owner)
+    mutex := concurrency.NewMutex(session, "/chapter3/mutex_txn")
 RETRY:
     select {
-    case <-s.Done():
+    case <-session.Done():
         log.Fatal("session has been orphaned")
     default:
     }
-    err = m.Lock(context.TODO())
+    err = mutex.Lock(context.TODO())
     if err != nil {
         log.Fatal(err)
     }
     resp, err := client.Txn(context.TODO()).
-        If(m.IsOwner()).
-        Then(clientv3.OpPut("/chapter3/mutex/owner", "test")).
+        If(mutex.IsOwner()).
+        Then(clientv3.OpPut("/chapter3/mutex_owner", "test")).
         Commit()
     if err != nil {
         log.Fatal(err)
     }
     if !resp.Succeeded {
         fmt.Println("the lock was not acquired")
-        m.Unlock(context.TODO())
+        mutex.Unlock(context.TODO())
         goto RETRY
     }
-    // do something
-    err = m.Unlock(context.TODO())
+    err = mutex.Unlock(context.TODO())
     if err != nil {
         log.Fatal(err)
     }

@@ -20,36 +20,36 @@ func main() {
 	}
 	defer client.Close()
 
-	s, err := concurrency.NewSession(client)
+	session, err := concurrency.NewSession(client)
 	if err != nil {
 		log.Fatal(err)
 	}
-	m := concurrency.NewMutex(s, "/chapter3/mutex")
+
 	//#@@range_begin(owner)
+	mutex := concurrency.NewMutex(session, "/chapter3/mutex_txn")
 RETRY:
 	select {
-	case <-s.Done():
+	case <-session.Done():
 		log.Fatal("session has been orphaned")
 	default:
 	}
-	err = m.Lock(context.TODO())
+	err = mutex.Lock(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
 	resp, err := client.Txn(context.TODO()).
-		If(m.IsOwner()).
-		Then(clientv3.OpPut("/chapter3/mutex/owner", "test")).
+		If(mutex.IsOwner()).
+		Then(clientv3.OpPut("/chapter3/mutex_owner", "test")).
 		Commit()
 	if err != nil {
 		log.Fatal(err)
 	}
 	if !resp.Succeeded {
 		fmt.Println("the lock was not acquired")
-		m.Unlock(context.TODO())
+		mutex.Unlock(context.TODO())
 		goto RETRY
 	}
-	// do something
-	err = m.Unlock(context.TODO())
+	err = mutex.Unlock(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}

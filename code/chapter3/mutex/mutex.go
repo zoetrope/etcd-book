@@ -21,18 +21,18 @@ func main() {
 	defer client.Close()
 
 	//#@@range_begin(lock)
-	s, err := concurrency.NewSession(client)
+	session, err := concurrency.NewSession(client)
 	if err != nil {
 		log.Fatal(err)
 	}
-	m := concurrency.NewMutex(s, "/chapter3/mutex")
-	err = m.Lock(context.TODO())
+	mutex := concurrency.NewMutex(session, "/chapter3/mutex")
+	err = mutex.Lock(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("acquired lock")
 	time.Sleep(5 * time.Second)
-	err = m.Unlock(context.TODO())
+	err = mutex.Unlock(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
