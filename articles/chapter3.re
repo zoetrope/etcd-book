@@ -301,7 +301,7 @@ RETRY:
 === STM(Software Transactional Memory)
 
 @<hd>{chapter3|Transaction}ではトランザクションを利用してデータの不整合が起きないような処理を記述しました。
-しかし、リビジョンの比較やリトライ処理は少々記述が難しかったのではないでしょうか。
+しかし、リビジョンの比較やリトライ処理は少々記述が複雑でした。
 扱うキーバリューが増えてくるとトランザクションの記述はさらに複雑になります。
 そこで、etcdではSTM(Software Transactional Memory)という仕組みを提供し、簡単に排他制御を記述することが可能になっています。
 
@@ -361,6 +361,11 @@ _, err := concurrency.NewSTM(client, func(stm concurrency.STM) error {
 })
 //}
 
+//note[]{
+一般的なトランザクション分離レベルのReadCommittedでは、ファジーリード(同じキーの値を複数回読んだときに異なる値が読まれる)が発生します。
+しかし現在のetcdの実装では、一度読み込んだ値はキャッシュされているためファジーリードは発生しません。
+//}
+
 また、分離レベルが異なるとコンフリクトの検出方式も変わります。
 以下のようにkey1の値を読み取って加工し、key2に書き込むような処理を考えてみます。
 
@@ -383,6 +388,9 @@ RepeatableReadsとSerializableは、key1が更新されていたらコンフリ�
 ReadCommittedはまったくコンフリクトを検出しません。通常は利用しないほうがよいでしょう。
 
 === Leader Election
+
+次にLeader Election機能について紹介します。
+これは、異なるサーバー上で動作する複数のプロセスの中から、1つのプロセスをリーダーとして選出するための仕組みです。
 
 //list[leader][リーダー選出]{
 #@maprange(../code/chapter3/leader/leader.go,leader)
