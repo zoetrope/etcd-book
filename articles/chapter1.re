@@ -2,6 +2,7 @@
 
 == etcdを起動してみよう
 
+本書ではDockerを利用してetcd
 今回はDockerを利用してetcdを起動するので、まずはDockerがインストールされていることを確認しましょう。
 
 //cmd{
@@ -10,6 +11,7 @@ Docker version 18.06.1-ce, build e68fc7a
 //}
 
 次にetcdを起動します。
+ここでは、
 
 //cmd{
 $ docker run --name etcd \
@@ -52,11 +54,27 @@ etcdに以下の起動オプションを指定します。
 2019-03-03 03:53:36.625491 N | embed: serving insecure client requests on [::]:2379, this is strongly discouraged!
 //}
 
-次にetcdctlを使ってみましょう。etcdctlはetcdとやり取りするためのコマンドラインツールです。
+次にetcdctlを使います。etcdctlはetcdとやり取りするためのコマンドラインツールです。
+etcdctlもDockerコンテナの中に含まれています。
+先ほど起動したコンテナに入って、etcdctlを実行してみましょう。
 
 //terminal{
-$ docker exec -e "ETCDCTL_API=3" etcd etcdctl --endpoint=http://127.0.0.1:2379 endpoint health
-127.0.0.1:2379 is healthy: successfully committed proposal: took = 1.154489ms
+$ docker exec -e "ETCDCTL_API=3" etcd etcdctl
+NAME:
+        etcdctl - A simple command line client for etcd3.
+
+USAGE:
+        etcdctl
+
+VERSION:
+        3.3.12
+
+API VERSION:
+        3.3
+
+
+COMMANDS:
+        以下省略
 //}
 
 現在のetcdはAPIのバージョンとしてv2とv3をサポートしており、etcdctlはデフォルトでAPI v2を利用するようになっています。
@@ -64,10 +82,10 @@ API v3を利用するには環境変数@<code>{ETCDCTL_API=3}を指定する必�
 
 //footnote[etcdv3][etcd 3.4から、デフォルトでAPI v3が利用されるようになります。]
 
-毎回長いコマンドを打ち込むのは面倒なので、以下のようなエイリアスを用意しておくと便利でしょう。
+毎回長いコマンドを打ち込むのは面倒なので、以下のようなエイリアスを用意しておくと便利です。
 
 //terminal{
-$ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl --endpoint=http://127.0.0.1:2379'
+$ alias etcdctl='docker exec -e "ETCDCTL_API=3" etcd etcdctl'
 //}
 
 == etcdにデータを読み書きしてみよう
@@ -82,7 +100,7 @@ OK
 //}
 
 次にキーを指定して値を読み込んでみましょう。
-@<code>{/chapter1/hello}というキーを指定してgetコマンドを実行すると、先程書き込んだバリューが表示されます。
+@<code>{/chapter1/hello}というキーを指定してgetコマンドを実行すると、先ほど書き込んだバリューが表示されます。
 
 //terminal{
 $ etcdctl get /chapter1/hello            
@@ -100,28 +118,31 @@ etcd v3ではキーは内部的にはバイト配列として扱われており�
 //note[キースペースの変更]{
 etcd v2とv3ではキーの管理方法が大きく変わりました。
 etcd v2ではキーをファイルシステムのように/で区切って階層的に管理していました。
-etcd v3からはキーを単一のバイト配列としてフラットなキースペースで管理するように。
+etcd v3からはキーを単一のバイト配列としてフラットなキースペースで管理するようになりました。
 //}
 
-etcdには、MySQLやPostgreSQLにあるようなデータベースやテーブルのような概念はありません。
+etcdには、MySQLやPostgreSQLにおけるデータベースやテーブルのような概念はありません。
 そのため複数のアプリケーションで1つのetcdクラスタを共有する場合は、アプリケーションごとにキーのプレフィックスを決めておくことが一般的です。
 例えばアプリケーション1は@<code>{/app1/}から始まるキー、アプリケーション2は@<code>{/app2/}から始まるキーを使うというような決まりにします。
 etcdではキーのプレフィックスに対してアクセス権を設定することができるので、@<code>{/app1/}から始まるキーはアプリケーション1の実行ユーザーのみが
 読み書き可能な設定にしておきます。
 
 具体的にKubernetesの例を見てみましょう。
-以下のようにKubernetesは@<code>{/registry/}から始まるキーを利用しています。
-その後ろにリソースのタイプ(podやservice)、ネームスペース(defaultやkube-system)、リソースの名前(mypodやnginx)を@<code>{/}でつないでキーにしています。
+Kubernetesが動いている環境で、etcdctlを利用してキーの一覧を取得してみます。
 
 //terminal{
 $ etcdctl get / --prefix=true --keys-only
 /registry/pods/default/mypod
 /registry/services/kube-system/nginx
+  以下省略
 //}
+
+このようにKubernetesは@<code>{/registry/}から始まるキーを利用しています。
+その後ろにリソースのタイプ(podやservice)、ネームスペース(defaultやkube-system)、リソースの名前(mypodやnginx)を@<code>{/}でつないでキーにしています。
 
 === バリュー
 
-キーは@<code>{/}で区切った文字列を利用することが一般的です。
+キーは@<code>{/}で区切った文字列を利用するのが一般的だと解説しました。
 ではバリューはどのような形式にするのがよいのでしょうか？
 バリューも内部的にはバイト配列として扱われています。
 1つのバリューのサイズは最大1MBまで格納することができます。
@@ -133,11 +154,13 @@ $ etcdctl get / --prefix=true --keys-only
 JSONやProtocol Bufferなどでエンコードした形式で格納してもよいでしょう。
 
 具体的にKubernetesの例を見てみましょう。
-以下のコマンドを実行してバリューを取得すると、バイナリ形式のデータが出力されます。
+先ほどと同じように、Kubernetesが動いている環境でetcdctlを利用してバリューを取得してみます。
 
 //terminal{
 $ etcdctl get /registry/pods/default/mypod
 //}
+
+このコマンドを実行すると、バイナリ形式のデータが出力されます。
 
 Kubernetesではv1.6以降はProtocol Buffer形式でデータを格納しているため、そのままでは読むことができません。
 Auger@<fn>{auger}などのツールを利用すればデコードして表示することも可能です。
@@ -145,4 +168,4 @@ Auger@<fn>{auger}などのツールを利用すればデコードして表示す
 //footnote[auger][https://github.com/jpbetz/auger]
 
 なお、etcdのデータファイルにはキーバリューの内容がそのまま平文で保存されています。
-秘密情報などを管理したい場合はバリューを暗号化して格納すべきです。
+秘密情報などを管理したい場合はバリューを暗号化して格納する必要があります。

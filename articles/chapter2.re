@@ -1,8 +1,8 @@
 = etcdプログラミングの基本
 
 本章以降ではetcdのクライアントライブラリを利用して、Go言語でetcdを操作するプログラムの書き方を紹介していきます。
-ここではまず、etcdに接続するクライアントをの作り方と、それを利用したキー・バリューの読み書きの方法、
-さらにキー・バリューの変更を監視する方法や、キーに有効期限を指定する方法を紹介します。
+ここではまず、etcdに接続するクライアントをの作り方と、それを利用したキー・バリューの読み書きの方法を解説します。
+さらにキー・バリューの変更を監視する方法や、キーの有効期限を指定する方法を紹介します。
 
 == クライアントを用意する
 
@@ -85,7 +85,7 @@ $ go run client.go
 まず@<code>{github.com/coreos/etcd/clientv3}をインポートしています。
 これによりetcdのクライアントライブラリが利用できるようになります。
 
-//list[import][]{
+//list[?][]{
 import (
     "github.com/coreos/etcd/clientv3"
 )
@@ -100,7 +100,7 @@ etcd v3.3までのパッケージ名は@<code>{github.com/coreos/etcd/clientv3}�
 これはetcdに接続するときに利用する設定で、接続先のアドレスや接続時のタイムアウト時間などを指定できます。
 ここではlocalhost上の2379番ポートに接続し、接続タイムアウト時間が3秒になるように設定しています。
 
-//list[config][]{
+//list[?][]{
 cfg := clientv3.Config{
     Endpoints:   []string{"http://localhost:2379"},
     DialTimeout: 3 * time.Second,
@@ -109,9 +109,9 @@ cfg := clientv3.Config{
 
 この設定を利用して、@<code>{clientv3.New()}でクライアントを作成します。
 このとき、etcdとの接続に失敗するとエラーが返ってくるのでエラー処理をしましょう。
-また、etcdとのやり取りが完了したときに@<code>{client.Close()}を呼び出すようにしておきます。
+また、etcdとのやり取りが終了したら@<code>{client.Close()}を呼び出すようにしておきます。
 
-//list[client.new][]{
+//list[?][]{
 client, err := clientv3.New(cfg)
 if err != nil {
     log.Fatal(err)
@@ -122,7 +122,7 @@ defer client.Close()
 最後に作成したクライアントを利用して、@<code>{MemberList()}を呼び出し、その結果を画面に表示しています。
 このとき引数に@<code>{context.TODO()}を渡していますが、@<code>{context}については後ほど詳しく解説します。
 
-//list[memberlist][]{
+//list[?][]{
 resp, err := client.MemberList(context.TODO())
 if err != nil {
     log.Fatal(err)
@@ -135,11 +135,12 @@ for _, m := range resp.Members {
 このように、クライアントを作成しそれを利用して必要なAPIを呼び出すのが、etcdプログラミングの基本的な流れになります。
 
 == Key Value
+
 では、先ほど作成したクライアントを利用して、etcdにデータを書き込んでみましょう。
 
 @<list>{client}のファイルをコピーし、@<code>{MemberList()}を呼び出す代わりに以下のようなコードを書いてみます。
 
-//list[kv-write][データの書き込み]{
+//list[?][]{
 #@maprange(../code/chapter2/kv/kv.go,write)
     _, err = client.Put(context.TODO(), "/chapter2/kv", "my-value")
     if err != nil {
@@ -154,7 +155,7 @@ for _, m := range resp.Members {
 では、書き込んだ値が正しく読み込めるかどうか試してみましょう。
 先程のコードの続きに以下の処理を追加します。
 
-//list[kv-read][データの読み込み]{
+//list[?][]{
 #@maprange(../code/chapter2/kv/kv.go,read)
     resp, err := client.Get(context.TODO(), "/chapter2/kv")
     if err != nil {
@@ -185,8 +186,8 @@ for _, m := range resp.Members {
 
 == Option
 
-@<code>{client.Put()}, @<code>{client.Get()}, @<code>{client.Delete()}にはいろいろなオプションを指定することができます。
-ここでは@<code>{client.Get()}を例に上げていくつかのオプションをみてみましょう。
+先ほど紹介した@<code>{Put()}, @<code>{Get()}, @<code>{Delete()}メソッドにはいろいろなオプションを指定することができます。
+ここでは@<code>{client.Get()}を例にいくつかのオプションをみてみましょう。
 
 //list[opts-read][オプションの指定]{
 #@maprange(../code/chapter2/opts/opts.go,read)
@@ -215,16 +216,16 @@ for _, m := range resp.Members {
 /chapter2/option/key1: 
 //}
 
-まず@<code>{WithPrefix}を指定すると、キーに指定したプレフィックス(ここでは@<code>{/chapter2/option})から始まるキーをすべて取得します。
-次に@<code>{WithSort}を指定すると結果をソートすることができます。ここではValueの昇順で並び替えています。
-最後の@<code>{WithKeysOnly}を指定すると、キーのみを取得します。そのため結果に値が出力されていません。
+まず@<code>{WithPrefix()}を指定すると、キーに指定したプレフィックス(ここでは@<code>{/chapter2/option})から始まるキーをすべて取得します。
+次に@<code>{WithSort()}を指定すると結果をソートすることができます。ここではValueの昇順で並び替えています。
+最後の@<code>{WithKeysOnly()}を指定するとキーのみを取得します。そのため結果に値が出力されていません。
 
 この他にもキーの数だけを返す@<code>{WithCountOnly}や、見つかった最初のキーだけを返す@<code>{WithFirstKey}などたくさんのオプションがあります。
 ぜひ@<href>{https://godoc.org/github.com/coreos/etcd/clientv3#OpOption}を一度みてください。
 
 == MVCC (MultiVersion Concurrency Control)
 
-etcdはMVCC (MultiVersion Concurrency Control)モデルを採用したキーバリューストアです。
+etcdはMVCC(MultiVersion Concurrency Control)モデルを採用したキーバリューストアです。
 すなわち、etcdに対して実施した変更はすべて履歴が保存されており、それぞれにリビジョン番号がつけられています。
 リビジョン番号を指定して値を読み出せば、過去の時点での値も読み出すことができます。
 
@@ -234,7 +235,7 @@ etcdはMVCC (MultiVersion Concurrency Control)モデルを採用したキーバ�
 
 では、具体的にリビジョン番号が更新されていく様子を見てみましょう。
 
-その前に@<code>{client.Get()}の結果を詳しく表示するヘルパー関数を用意しておきます。
+その前に@<code>{Get()}メソッドのレスポンスを詳しく表示するヘルパー関数を用意しておきます。
 
 //list[mvcc-print][]{
 #@maprange(../code/chapter2/revision/revision.go,print)
@@ -251,7 +252,7 @@ func printResponse(resp *clientv3.GetResponse) {
 
 では書き込んだ値を取得して、その結果を表示してみましょう。
 
-//list[mvcc-rev1][]{
+//list[?][]{
 #@maprange(../code/chapter2/revision/revision.go,rev1)
     client.Put(context.TODO(), "/chapter2/rev/1", "123")
     resp, _ := client.Get(context.TODO(), "/chapter2/rev", clientv3.WithPrefix())
@@ -341,7 +342,7 @@ kv[0]: key:"/chapter2/rev/1" create_revision:41 mod_revision:41 version:1 value:
 
 === コンパクション
 
-//list[?][compaction]{
+//list[?][]{
 #@maprange(../code/chapter2/compaction/compaction.go,history)
     client.Put(context.TODO(), "/chapter2/compaction", "hoge")
     client.Put(context.TODO(), "/chapter2/compaction", "fuga")
@@ -369,7 +370,7 @@ rev: 231, value: fuga
 rev: 232, value: fuga
 //}
 
-//list[?][compaction]{
+//list[?][]{
 #@maprange(../code/chapter2/compaction/compaction.go,compaction)
     _, err = client.Compact(context.TODO(), resp.Kvs[0].ModRevision)
     if err != nil {
@@ -761,7 +762,7 @@ if err != nil {
 
 == Namespace
 
-@<chap>{chapter1}において、キーにはアプリケーションごとにプレフィックスをつけることがよくあると説明しました。
+@<chap>{chapter1}において、キーにはアプリケーションごとにプレフィックスをつけるのが一般的だと説明しました。
 しかし、アプリケーションを開発する際にすべてのキーにプレフィックスを指定するのは少々めんどうではないですか？
 そこで、etcdのクライアントライブラリではnamespaceという機能が提供されています。
 
