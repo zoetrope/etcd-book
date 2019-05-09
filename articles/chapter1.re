@@ -2,7 +2,6 @@
 
 == etcdを起動してみよう
 
-本書ではDockerを利用してetcd
 今回はDockerを利用してetcdを起動するので、まずはDockerがインストールされていることを確認しましょう。
 
 //cmd{
@@ -11,7 +10,6 @@ Docker version 18.06.1-ce, build e68fc7a
 //}
 
 次にetcdを起動します。
-ここでは、
 
 //cmd{
 $ docker run --name etcd \
@@ -25,11 +23,12 @@ $ docker run --name etcd \
       --listen-client-urls http://0.0.0.0:2379
 //}
 
+Dockerに以下のオプションを指定します。
+
 : -p 2379:2379
     コンテナ外からetcdのAPIを呼び出せるように2379番ポートをホストにバインドしています。
 : -v etcd-data:/var/lib/etcd
-    etcd-dataというボリュームを作成し、コンテナの@<code>{/var/lib/etcd}にバインドしています。これによりコンテナを終了してもetcdのデータは
-消えません。
+    etcd-dataというボリュームを作成し、コンテナの@<code>{/var/lib/etcd}にバインドしています。これによりコンテナを終了してもetcdのデータは消えません。
 
 etcdに以下の起動オプションを指定します。
 
@@ -41,7 +40,7 @@ etcdに以下の起動オプションを指定します。
 
 以下のようなログが出力されればetcdの起動は成功です@<fn>{insecure}。
 
-//footnote[insecure][安全ではないのでおすすめしないというメッセージが表示されています。安全な接続方法については後ほど解説します。]
+//footnote[insecure][serving insecure client requests on [::\]:2379, this is strongly discouraged!というメッセージが表示されていますがここでは無視します。安全な接続方法については後ほど解説します。]
 
 //terminal{
 2019-03-03 03:53:34.908093 I | etcdmain: etcd Version: 3.3.12
