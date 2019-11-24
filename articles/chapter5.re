@@ -2,6 +2,95 @@
 
 == etcd-dump-logs
 
+etcd-dump-logsは、etcdのコンテナイメージにも含まれていない。バイナリ配布もされていない。自前でビルドする必要がある。
+
+```
+$ git clone https://github.com/etcd-io/etcd.git
+$ cd etcd
+$ go install ./tools/etcd-dump-logs
+```
+
+```
+$ docker volume ls
+DRIVER              VOLUME NAME
+local               cluster_etcd1-data
+local               cluster_etcd2-data
+local               cluster_etcd3-data
+```
+
+```
+$ docker volume inspect cluster_etcd1-data 
+[
+    {
+        "CreatedAt": "2019-04-27T12:34:40+09:00",
+        "Driver": "local",
+        "Labels": {
+            "com.docker.compose.project": "cluster",
+            "com.docker.compose.version": "1.22.0",
+            "com.docker.compose.volume": "etcd1-data"
+        },
+        "Mountpoint": "/var/lib/docker/volumes/cluster_etcd1-data/_data",
+        "Name": "cluster_etcd1-data",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+```
+
+```
+$ sudo etcd-dump-logs /var/lib/docker/volumes/cluster_etcd1-data/_data
+Snapshot:
+empty
+Start dupmping log entries from snapshot.
+WAL metadata:
+nodeID=ade526d28b1f92f7 clusterID=8f2a2ec5c0087dcb term=13 commitIndex=16 vote=bd388e7810915853
+WAL entries:
+lastIndex=17
+term         index      type    data
+   1             1      conf    method=ConfChangeAddNode id=ade526d28b1f92f7
+   1             2      conf    method=ConfChangeAddNode id=bd388e7810915853
+   1             3      conf    method=ConfChangeAddNode id=d282ac2ce600c1ce
+   2             4      norm
+   2             5      norm    method=PUT path="/0/members/ade526d28b1f92f7/attributes" val="{\"name\":\"etcd1\",\"clientURLs\":[\"http://etcd1:2379\"]}"
+   2             6      norm    method=PUT path="/0/members/bd388e7810915853/attributes" val="{\"name\":\"etcd3\",\"clientURLs\":[\"http://etcd3:2379\"]}"
+   2             7      norm    method=PUT path="/0/version" val="3.3.0"
+   2             8      norm    method=PUT path="/0/members/d282ac2ce600c1ce/attributes" val="{\"name\":\"etcd2\",\"clientURLs\":[\"http://etcd2:2379\"]}"
+   2             9      norm    method=QGET path=""
+   3            10      norm
+   4            11      norm
+   5            12      norm
+   5            13      norm    method=PUT path="/0/members/d282ac2ce600c1ce/attributes" val="{\"name\":\"etcd2\",\"clientURLs\":[\"http://etcd2:2379\"]}"
+   5            14      norm    method=PUT path="/0/members/bd388e7810915853/attributes" val="{\"name\":\"etcd3\",\"clientURLs\":[\"http://etcd3:2379\"]}"
+  12            15      norm
+  12            16      norm    method=PUT path="/0/members/ade526d28b1f92f7/attributes" val="{\"name\":\"etcd1\",\"clientURLs\":[\"http://etcd1:2379\"]}"
+  13            17      norm
+
+Entry types () count is : 17
+```
+
+
+```
+/ # ETCDCTL_API=3 etcdctl --endpoints=etcd1:2379,etcd2:2379,etcd3:2379 endpoint status -w table
++------------+------------------+---------+---------+-----------+-----------+------------+
+|  ENDPOINT  |        ID        | VERSION | DB SIZE | IS LEADER | RAFT TERM | RAFT INDEX |
++------------+------------------+---------+---------+-----------+-----------+------------+
+| etcd1:2379 | ade526d28b1f92f7 |  3.3.12 |   20 kB |     false |        12 |         16 |
+| etcd2:2379 | d282ac2ce600c1ce |  3.3.12 |   20 kB |      true |        12 |         16 |
+| etcd3:2379 | bd388e7810915853 |  3.3.12 |   20 kB |     false |        12 |         16 |
++------------+------------------+---------+---------+-----------+-----------+------------+
+/ # ETCDCTL_API=3 etcdctl --endpoints=etcd1:2379,etcd2:2379,etcd3:2379 move-leader bd388e7810915853
+Leadership transferred from d282ac2ce600c1ce to bd388e7810915853
+/ # ETCDCTL_API=3 etcdctl --endpoints=etcd1:2379,etcd2:2379,etcd3:2379 endpoint status -w table
++------------+------------------+---------+---------+-----------+-----------+------------+
+|  ENDPOINT  |        ID        | VERSION | DB SIZE | IS LEADER | RAFT TERM | RAFT INDEX |
++------------+------------------+---------+---------+-----------+-----------+------------+
+| etcd1:2379 | ade526d28b1f92f7 |  3.3.12 |   20 kB |     false |        13 |         17 |
+| etcd2:2379 | d282ac2ce600c1ce |  3.3.12 |   20 kB |     false |        13 |         17 |
+| etcd3:2379 | bd388e7810915853 |  3.3.12 |   20 kB |      true |        13 |         17 |
++------------+------------------+---------+---------+-----------+-----------+------------+
+```
+
+
 == etcd operator
  * minikube
 
