@@ -4,21 +4,21 @@
 
 etcd-dump-logsは、etcdのコンテナイメージにも含まれていない。バイナリ配布もされていない。自前でビルドする必要がある。
 
-```
+//terminal{
 $ git clone https://github.com/etcd-io/etcd.git
 $ cd etcd
 $ go install ./tools/etcd-dump-logs
-```
+//}
 
-```
+//terminal{
 $ docker volume ls
 DRIVER              VOLUME NAME
 local               cluster_etcd1-data
 local               cluster_etcd2-data
 local               cluster_etcd3-data
-```
+//}
 
-```
+//terminal{
 $ docker volume inspect cluster_etcd1-data 
 [
     {
@@ -35,9 +35,9 @@ $ docker volume inspect cluster_etcd1-data
         "Scope": "local"
     }
 ]
-```
+//}
 
-```
+//terminal{
 $ sudo etcd-dump-logs /var/lib/docker/volumes/cluster_etcd1-data/_data
 Snapshot:
 empty
@@ -66,17 +66,17 @@ term         index      type    data
   13            17      norm
 
 Entry types () count is : 17
-```
+//}
 
 
-```
+//terminal{
 / # ETCDCTL_API=3 etcdctl --endpoints=etcd1:2379,etcd2:2379,etcd3:2379 endpoint status -w table
 +------------+------------------+---------+---------+-----------+-----------+------------+
 |  ENDPOINT  |        ID        | VERSION | DB SIZE | IS LEADER | RAFT TERM | RAFT INDEX |
 +------------+------------------+---------+---------+-----------+-----------+------------+
-| etcd1:2379 | ade526d28b1f92f7 |  3.3.12 |   20 kB |     false |        12 |         16 |
-| etcd2:2379 | d282ac2ce600c1ce |  3.3.12 |   20 kB |      true |        12 |         16 |
-| etcd3:2379 | bd388e7810915853 |  3.3.12 |   20 kB |     false |        12 |         16 |
+| etcd1:2379 | ade526d28b1f92f7 |  3.3.17 |   20 kB |     false |        12 |         16 |
+| etcd2:2379 | d282ac2ce600c1ce |  3.3.17 |   20 kB |      true |        12 |         16 |
+| etcd3:2379 | bd388e7810915853 |  3.3.17 |   20 kB |     false |        12 |         16 |
 +------------+------------------+---------+---------+-----------+-----------+------------+
 / # ETCDCTL_API=3 etcdctl --endpoints=etcd1:2379,etcd2:2379,etcd3:2379 move-leader bd388e7810915853
 Leadership transferred from d282ac2ce600c1ce to bd388e7810915853
@@ -84,11 +84,11 @@ Leadership transferred from d282ac2ce600c1ce to bd388e7810915853
 +------------+------------------+---------+---------+-----------+-----------+------------+
 |  ENDPOINT  |        ID        | VERSION | DB SIZE | IS LEADER | RAFT TERM | RAFT INDEX |
 +------------+------------------+---------+---------+-----------+-----------+------------+
-| etcd1:2379 | ade526d28b1f92f7 |  3.3.12 |   20 kB |     false |        13 |         17 |
-| etcd2:2379 | d282ac2ce600c1ce |  3.3.12 |   20 kB |     false |        13 |         17 |
-| etcd3:2379 | bd388e7810915853 |  3.3.12 |   20 kB |      true |        13 |         17 |
+| etcd1:2379 | ade526d28b1f92f7 |  3.3.17 |   20 kB |     false |        13 |         17 |
+| etcd2:2379 | d282ac2ce600c1ce |  3.3.17 |   20 kB |     false |        13 |         17 |
+| etcd3:2379 | bd388e7810915853 |  3.3.17 |   20 kB |      true |        13 |         17 |
 +------------+------------------+---------+---------+-----------+-----------+------------+
-```
+//}
 
 
 == etcd operator
@@ -169,12 +169,11 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Prometheusにはサービスディスカバリを利用して、自動的にモニタリングの対象をみつける機能があります。
 詳しくは以下参照。
+
 https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubernetes_sd_config
 
 この機能を利用してetcdのメトリクスも収集してもらいましょう。
 このとき、etcdのPodにアノテーションを付与する必要があります。
-
-また、
 
 //list[etcd-cluster][etcd-cluster.yml]{
 #@mapfile(../code/chapter5/prometheus/etcd-cluster.yml)
@@ -184,7 +183,7 @@ metadata:
   name: "example-etcd-cluster"
 spec:
   size: 3
-  version: "3.3.12"
+  version: "3.3.17"
   pod:
     annotations:
       prometheus.io/scrape: 'true'

@@ -5,8 +5,8 @@
 今回はDockerを利用してetcdを起動するので、まずはDockerがインストールされていることを確認しましょう。
 
 //cmd{
-$ docker -v
-Docker version 18.06.1-ce, build e68fc7a
+$ docker -v     
+Docker version 19.03.5, build 633a0ea838
 //}
 
 次にetcdを起動します。
@@ -15,7 +15,7 @@ Docker version 18.06.1-ce, build e68fc7a
 $ docker run --name etcd \
     -p 2379:2379 \
     --volume=etcd-data:/etcd-data \
-    --name etcd quay.io/coreos/etcd:v3.3.12 \
+    --name etcd gcr.io/etcd-development/etcd:v3.3.17 \
     /usr/local/bin/etcd \
       --name=etcd-1 \
       --data-dir=/etcd-data \
@@ -43,14 +43,14 @@ etcdに以下の起動オプションを指定します。
 //footnote[insecure][serving insecure client requests on [::\]:2379, this is strongly discouraged!というメッセージが表示されていますがここでは無視します。安全な接続方法については後ほど解説します。]
 
 //terminal{
-2019-03-03 03:53:34.908093 I | etcdmain: etcd Version: 3.3.12
-2019-03-03 03:53:34.908213 I | etcdmain: Git SHA: GitNotFound
-2019-03-03 03:53:34.908217 I | etcdmain: Go Version: go1.10.8
-2019-03-03 03:53:34.908223 I | etcdmain: Go OS/Arch: linux/amd64
+2019-11-24 05:29:22.996364 I | etcdmain: etcd Version: 3.3.17
+2019-11-24 05:29:22.996423 I | etcdmain: Git SHA: 6d8052314
+2019-11-24 05:29:22.996427 I | etcdmain: Go Version: go1.12.9
+2019-11-24 05:29:22.996430 I | etcdmain: Go OS/Arch: linux/amd64
   ・・中略・・
-2019-03-03 03:53:36.625034 I | etcdserver: published {Name:etcd-1 ClientURLs:[http://0.0.0.0:2379]} to cluster cdf818194e3a8c32
-2019-03-03 03:53:36.625087 I | embed: ready to serve client requests
-2019-03-03 03:53:36.625491 N | embed: serving insecure client requests on [::]:2379, this is strongly discouraged!
+2019-11-24 05:29:24.603553 I | etcdserver: published {Name:etcd-1 ClientURLs:[http://0.0.0.0:2379]} to cluster cdf818194e3a8c32
+2019-11-24 05:29:24.603602 I | embed: ready to serve client requests
+2019-11-24 05:29:24.603989 N | embed: serving insecure client requests on [::]:2379, this is strongly discouraged!
 //}
 
 次にetcdctlを使います。etcdctlはetcdとやり取りするためのコマンドラインツールです。
@@ -66,7 +66,7 @@ USAGE:
         etcdctl
 
 VERSION:
-        3.3.12
+        3.3.17
 
 API VERSION:
         3.3

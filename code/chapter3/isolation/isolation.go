@@ -41,7 +41,7 @@ func fuzzyRead(client *clientv3.Client) {
 			v2 := stm.Get("/chapter3/iso/fuzzy")
 			if v1 != v2 {
 				// ReadCommittedが正しく実装されているならここでファジーリードが発生するはず。
-				// しかしetcd v3.3.12ではちゃんと実装されてない
+				// しかしetcd v3.3.17ではちゃんと実装されてない
 				fmt.Printf("fuzzy:%d, %s, %s\n", d, v1, v2)
 			}
 			stm.Put("/chapter3/iso/fuzzy", strconv.Itoa(value))

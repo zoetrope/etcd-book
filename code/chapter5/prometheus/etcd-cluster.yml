@@ -4,7 +4,7 @@ metadata:
   name: "example-etcd-cluster"
 spec:
   size: 3
-  version: "3.3.12"
+  version: "3.3.17"
   pod: 
     annotations:
       prometheus.io/scrape: 'true'

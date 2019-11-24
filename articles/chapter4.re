@@ -9,7 +9,7 @@ version: '3'
 services:
   etcd1:
     container_name: etcd1
-    image: quay.io/coreos/etcd:v3.3.12
+    image: gcr.io/etcd-development/etcd:v3.3.17
     ports:
       - 2379
       - 2380
@@ -28,7 +28,7 @@ services:
       - --initial-cluster-state=new
   etcd2:
     container_name: etcd2
-    image: quay.io/coreos/etcd:v3.3.12
+    image: gcr.io/etcd-development/etcd:v3.3.17
     ports:
       - 2379
       - 2380
@@ -47,7 +47,7 @@ services:
       - --initial-cluster-state=new
   etcd3:
     container_name: etcd3
-    image: quay.io/coreos/etcd:v3.3.12
+    image: gcr.io/etcd-development/etcd:v3.3.17
     ports:
       - 2379
       - 2380
@@ -259,7 +259,7 @@ version: '3'
 services:
   etcd1:
     container_name: etcd1
-    image: quay.io/coreos/etcd:v3.3.12
+    image: gcr.io/etcd-development/etcd:v3.3.17
     networks:
       app_net:
         ipv4_address: 172.30.0.11
