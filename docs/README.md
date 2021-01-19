@@ -1,56 +1,50 @@
-# はじめに
+# Preface
 
-## etcdとは
+## What is etcd?
 
-etcdは分散型のキーバリューストアです。
-etcdはもともと複数のマシンが協調しながら1台ずつ再起動する際に合意を取るための仕組みとして、CoreOS社[^1]によって開発されていました。
-etcdはその手軽さから様々ななソフトウェアのバックエンドとして採用されていましたが、Kubernetesのバックエンドに採用されたことで広く注目されるようになり、コミュニティの規模も大きくなりました。
-2018年12月にはCNCFに寄贈され、現在はオープンソースコミュニティにおいて活発に開発が進められています。
+etcd is a distributed key-value store.
+etcd was developed by CoreOS[^1] as a mechanism for multiple machines to agree on how to restart one by one while cooperating.
+etcd has been adopted as a backend for various software due to its ease of use.
+Its adoption as a backend for Kubernetes has brought it widespread attention and increased the community's size.
+In December 2018, it was donated to the CNCF and is currently under active development in the open-source community.
 
-[^1]: CoreOS社は2018年にRed Hat社に買収されました。
+[^1]: CoreOS was acquired by Red Hat in 2018.
 
-etcdには以下のような特徴があります。
+etcd has the following features.
 
-* 高可用性(High Availability)
-  etcdは高可用な構成でクラスタを構築することができます。
-  例えば5台のサーバーを使ってetcdクラスタを構築した場合、最大2台のサーバーが故障したとしてもクラスタの機能を正常に提供し続けることが可能です。
+* **High Availability**:
+  etcd allows you to build a high availability cluster.
+  It means that if you build an etcd cluster with five nodes, the cluster can continue to run even if up to two nodes fail.
 
-* 強い一貫性(Strong Consistency)
-  etcdは強い一貫性モデルを採用しています。
-  これはetcdクラスタに対してデータの書き込みに成功すると、その後にそのデータを読み出した場合は必ず書き込んだ値が読み込まれるということです。
-  この特徴は当たり前に聞こえるかもしれませんが、分散キーバリューストアの中には強い一貫性を持たないものも存在します。
-  例えば結果整合性(Eventually Consistency)を持つデータベースは、書き込んだ値はそのうち反映されればよいという考えです。
-  その代わりにスケールアウトさせることで非常に高いパフォーマンスを実現することが可能になっています。
-  一方で強い一貫性モデルを採用しているetcdは、スケールアウトさせてパフォーマンスを向上させることはできません。
+* **Strong Consistency**:
+  etcd adopts a strong consistency model.
+  It means that if data is successfully written to an etcd cluster, subsequent reads of the data will always read the values that were written.
+  This feature may sound obvious, but some distributed key-value stores do not have strong consistency.
+  For example, databases with eventually consistency will eventually reflect the values written, but it will take a little longer.
+  Instead, they can be scaled out to achieve very high performance.
+  On the other hand, etcd, which uses a strong consistency model, cannot be scaled out to improve performance.
 
-etcdはRaftと呼ばれる分散合意(Consensus)アルゴリズムに基づいて実装されています。
-Raftでは、クラスタの中からリーダーを選出する方法、ログ(データの変更イベント)をクラスタ内のメンバーに複製する方法、ネットワーク障害やメンバーの故障が発生したときにもそれらを安全におこなう方法が定められています。
-このアルゴリズムを正しく実装することで、ネットワーク障害などが発生しても、リーダーがクラスタ内にたかだか1つしか存在しないこと、ログの順序が入れ替わらないこと、データが不整合を起こさないことが保証されており、高い信頼性を実現することができます。
-Raftは理解しやすいことを重視しており、Paxosなど他の分散合意アルゴリズムと比べてシンプルで実装しやすくなっています。
+etcd is implemented based on a distributed consensus algorithm called Raft.
+Raft defines how to elect a leader from the cluster members, how to replicate logs, and how to do so safely in network failure or member failure.
+The correct implementation of the algorithm guarantees that there will be only one leader in the cluster, that the order of the logs will not be changed, and that the data will not be inconsistent, even in a network failure.
+Thus, high reliability can be achieved.
+Raft focuses on being easy to understand, making it simpler than other distributed consensus algorithms such as Paxos.
 
-また、etcdはキーバリューの読み書きだけでなく、Watch(値の変更監視)、Lease(キーの有効期限)、Leader Electionなどの機能を提供しています。
-これらの機能は分散システムを開発するときに非常に便利なものばかりです。
+In addition to reading and writing key values, etcd provides functions such as Watch (value change monitoring), Lease (key expiration), and Leader Election.
+These functions are very useful when developing distributed systems.
 
-一方でetcdには不得意な分野もあります。
-大きなデータは取り扱うことができず(クラスタ全体で扱えるデータサイズはデフォルトで2GB、最大8GB、1レコードのサイズは最大1.5MB)、メンバーの数を増やしても性能を向上させることはできないため、大容量のデータを高速に扱うような用途には向いていません。
+On the other hand, etcd has its weaknesses.
+It cannot handle large data (cluster data size is 2GB by default, maximum 8GB, maximum 1.5MB per record).
+Also, increasing the number of members does not improve the performance, so it is not suitable for large data applications.
 
-本書では、Go言語を利用してetcdの機能を利用するプログラミング手法を解説します。
+This book describes a programming technique to use the functions of etcd using Go language.
 
-### 本書が対象とするGoとetcdのバージョン
+### Target Version
 
-本書では2020年9月現在の最新版である下記のバージョンに基づいて解説をおこないます。
-異なるバージョンでは挙動が違う場合もあるので注意してください。
+* Go: 1.15.7
+* etcd: 3.4.14
 
-* Go: 1.15.2
-* etcd: 3.4.13
-
-### サンプルプログラム
-
-本書で解説するサンプルプログラムは下記のページで公開しています。
-
-* https://github.com/zoetrope/etcd-programming
-
-### 更新履歴
+### History
 
 * 2021: English edition
 * 2020/09/25: Support for etcd 3.4
