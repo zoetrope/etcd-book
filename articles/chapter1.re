@@ -27,8 +27,8 @@ Dockerに以下のオプションを指定します。
 
 : -p 2379:2379
     コンテナ外からetcdのAPIを呼び出せるように2379番ポートをホストにバインドしています。
-: -v etcd-data:/var/lib/etcd
-    etcd-dataというボリュームを作成し、コンテナの@<code>{/var/lib/etcd}にバインドしています。これによりコンテナを終了してもetcdのデータは消えません。
+: --volume=etcd-data:/etcd-data
+    etcd-dataというボリュームを作成し、コンテナの@<code>{/etcd-data}ディレクトリにバインドしています。これによりコンテナを終了してもetcdのデータは消えません。
 
 etcdに以下の起動オプションを指定します。
 
