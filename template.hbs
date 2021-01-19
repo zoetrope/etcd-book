@@ -1,0 +1,13 @@
+{{#if title}}
+{{#if id}}
+> <a id="{{id}}" href="https://github.com/zoetrope/etcd-book/blob/master/docs/{{originalPath}}">{{title}}</a>
+{{else}}
+> <a id="{{title}}" href="https://github.com/zoetrope/etcd-book/blob/master/docs/{{originalPath}}">{{title}}</a>
+{{/if}}
+{{else}}
+> <a id="{{fileName}}" href="https://github.com/zoetrope/etcd-book/blob/master/docs/{{originalPath}}">{{fileName}}</a>
+{{/if}}
+
+{{{backtick}}} {{lang}}
+{{{content}}}
+{{{backtick}}}

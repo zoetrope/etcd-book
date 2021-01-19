@@ -1,4 +1,5 @@
-*.pdf
 etcdctl
-go.sum
 node_modules/*
+_book
+vendor
+.idea

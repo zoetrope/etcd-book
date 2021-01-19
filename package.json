@@ -1,17 +1,29 @@
 {
   "name": "etcd-book",
   "version": "1.0.0",
-  "description": "",
+  "description": "etcd programming with Go",
   "main": "index.js",
-  "scripts": {
-    "textlint": "$(npm bin)/textlint articles/*.re"
+  "dependencies": {
+    "honkit": "^3.6.16"
   },
-  "author": "",
   "devDependencies": {
-    "textlint": "^11.2.3",
-    "textlint-plugin-review": "^0.3.3",
-    "textlint-rule-preset-ja-spacing": "^2.0.1",
-    "textlint-rule-preset-ja-technical-writing": "^3.1.2",
-    "textlint-rule-spellcheck-tech-word": "^5.0.0"
-  }
+    "gh-pages": "^3.1.0",
+    "gitbook-plugin-include-codeblock": "^3.2.2"
+  },
+  "scripts": {
+    "build": "honkit build",
+    "serve": "honkit serve",
+    "deploy": "gh-pages -d _book"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zoetrope/etcd-book.git"
+  },
+  "keywords": [],
+  "author": "zoetrope",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/zoetrope/etcd-book/issues"
+  },
+  "homepage": "https://zoetrope.github.io/etcd-book/"
 }
