@@ -1,26 +1,26 @@
-# etcdに触れてみよう
+# Let's get starting
 
-## etcdを起動してみよう
+## Run etcd
 
-それでは早速etcdを起動してみましょう。
-今回はDockerを利用してetcdを起動するので、まずはDockerがインストールされていることを確認しましょう。
+In this book, we will use Docker to run etcd.
+First, make sure that Docker is installed.
 
 ```
 $ docker -v
 Docker version 19.03.12, build 48a66213fe
 ```
 
-Dockerがインストールされていない場合は下記のページを参考にインストールをおこなってください。
+If Docker is not installed, refer to the following page to install it.
 
 * https://docs.docker.com/get-docker/
 
-次にetcdを起動します。
+Next, run etcd:
 
 ```
 $ docker run --name etcd \
     -p 2379:2379 \
     --volume=etcd-data:/etcd-data \
-    --name etcd gcr.io/etcd-development/etcd:v3.4.13 \
+    --name etcd gcr.io/etcd-development/etcd:v3.4.14 \
     /usr/local/bin/etcd \
       --name=etcd-1 \
       --data-dir=/etcd-data \
@@ -28,7 +28,7 @@ $ docker run --name etcd \
       --listen-client-urls http://0.0.0.0:2379
 ```
 
-Dockerに以下のオプションを指定します。
+Specify the following options to Docker:
 
 * `-p 2379:2379`
     コンテナ外からetcdのAPIを呼び出せるように2379番ポートをホストにバインドしています。
