@@ -1,5 +1,13 @@
-# etcd programming with Go
+# Go言語で学ぶetcdプログラミング
 
-[In English](https://zoetrope.github.io/etcd-book/)
-[In Japanese](https://zenn.dev/zoetro/books/560099d25d8d7f3c8449)
+## PDFダウンロード
 
+[https://github.com/zoetrope/etcd-book/releases](https://github.com/zoetrope/etcd-book/releases)
+
+## PDFの生成方法
+
+```console
+make pdf
+```
+
+Powered by [Re:VIEW Starter](https://kauplan.org/reviewstarter/)
